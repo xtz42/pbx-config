@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: pbx-config
+  description: Звуки тенанта из sounds/ (Git LFS) на сервер Asterisk
+  license: proprietary
+  min_ansible_version: "2.17"
+  platforms:
+    - name: EL
+      versions: ["9"]
+dependencies: []

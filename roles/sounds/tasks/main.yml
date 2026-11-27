@@ -1,0 +1,44 @@
+---
+- name: Найти звуки тенанта
+  ansible.builtin.set_fact:
+    _sounds_files: "{{ query('ansible.builtin.fileglob', *_patterns) | sort }}"
+  vars:
+    # fileglob не раскрывает «*» в каталогах — шаблон на каждый язык.
+    _patterns: "{{ tenants_current.languages | map('regex_replace', '^(.*)$', sounds_src_dir ~ '/tenants/' ~ tenants_current.code ~ '/\\1/*.wav') | list }}"
+
+- name: Проверить, что звуки тенанта есть
+  ansible.builtin.assert:
+    that: _sounds_files | length > 0
+    fail_msg: "Нет звуков в sounds/tenants/{{ tenants_current.code }}/<язык>/"
+    quiet: true
+
+- name: Проверить, что звуки скачаны из Git LFS, а не указатели
+  ansible.builtin.assert:
+    that: not (lookup('ansible.builtin.file', item, errors='ignore') | default('', true)).startswith('version https://git-lfs')
+    fail_msg: >-
+      {{ item }} — указатель Git LFS, а не звук. Выполните в репозитории:
+      git lfs install && git lfs pull
+    quiet: true
+  loop: "{{ _sounds_files }}"
+  loop_control:
+    label: "{{ item | relpath(sounds_src_dir) }}"
+
+- name: Каталоги звуков тенанта по языкам
+  ansible.builtin.file:
+    path: "{{ sounds_dest_dir }}/{{ item }}/tenants/{{ tenants_current.code }}"
+    state: directory
+    owner: asterisk
+    group: asterisk
+    mode: "0755"
+  loop: "{{ tenants_current.languages }}"
+
+- name: Звуки тенанта
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ sounds_dest_dir }}/{{ item | dirname | basename }}/tenants/{{ tenants_current.code }}/{{ item | basename }}"
+    owner: asterisk
+    group: asterisk
+    mode: "0644"
+  loop: "{{ _sounds_files }}"
+  loop_control:
+    label: "{{ item | relpath(sounds_src_dir) }}"
