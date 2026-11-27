@@ -3,7 +3,7 @@
 # Прогон по всему репозиторию:  pre-commit run --all-files
 # Обновление версий хуков:  pre-commit autoupdate (отдельным MR)
 # Вендоренные файлы (Asterisk ast-db-manage, схема Kamailio) хранятся как в оригинале.
-exclude: '^db/(asterisk-alembic|kamailio)/'
+exclude: '^(db/(asterisk-alembic|kamailio)|tests/wss/vendor)/'
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

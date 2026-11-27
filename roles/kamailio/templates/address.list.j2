@@ -11,3 +11,8 @@
 {% for host in groups['pbx'] | default([]) %}
 {{ kamailio_addr_group_pbx }} {{ hostvars[host].core_ip }} 32 0 {{ host }}
 {% endfor %}
+
+# Группа {{ kamailio_addr_group_operators }}: сети операторов (регистрация, WSS) — внутренняя сеть
+{% for net in sbc_operator_networks | default([]) %}
+{{ kamailio_addr_group_operators }} {{ net.split('/')[0] }} {{ net.split('/')[1] | default(32) }} 0 operators
+{% endfor %}

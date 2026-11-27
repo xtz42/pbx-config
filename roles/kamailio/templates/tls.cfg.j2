@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# TLS для WSS операторов. Стенд — самоподписанный сертификат,
+# прод — сертификат домена операторов из Ansible Vault (плейсхолдер).
+[server:default]
+method = TLSv1.2+
+verify_certificate = no
+require_certificate = no
+private_key = /etc/kamailio/tls/sbc.key
+certificate = /etc/kamailio/tls/sbc.crt
+
+[client:default]
+method = TLSv1.2+
+verify_certificate = no
+require_certificate = no

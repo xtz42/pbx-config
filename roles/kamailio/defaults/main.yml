@@ -6,6 +6,9 @@ kamailio_repo_baseurl: "https://rpm.kamailio.org/rhel/9/{{ kamailio_branch }}/{{
 kamailio_packages:
   - kamailio
   - kamailio-utils
+  - kamailio-tls
+  - kamailio-websocket
+  - kamailio-postgresql
 
 kamailio_debug: 2
 kamailio_children: 4
@@ -15,6 +18,18 @@ kamailio_pkg_mb: 8
 # Группы адресов модуля permissions (address.list).
 kamailio_addr_group_providers: 1
 kamailio_addr_group_pbx: 2
+kamailio_addr_group_operators: 3
+
+# WSS для операторов (браузерный софтфон) — порт на внутреннем интерфейсе.
+kamailio_wss_port: 8443
+# Самоподписанный сертификат для стендов. В проде — false и сертификат из Vault:
+# vault_kamailio_tls_cert / vault_kamailio_tls_key (плейсхолдер).
+kamailio_tls_selfsigned: true
+
+# Базы: регистрации (kamailio) и пароли операторов (базы тенантов, только чтение).
+kamailio_db_name: kamailio
+kamailio_db_user: kamailio
+kamailio_db_ro_user: kamailio_ro
 
 # Dispatcher (ADR 0003): возврат на ЦОД 1 через
 # ds_ping_interval × ds_inactive_threshold = 30 с × 20 = 10 мин стабильности.

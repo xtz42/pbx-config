@@ -4,14 +4,18 @@
 #
 # SBC {{ inventory_hostname }}: Kamailio {{ kamailio_version }} + rtpengine.
 #   edge ({{ edge_ip }}) — провайдер (транк), снаружи;
-#   core ({{ core_ip }}) — пары Asterisk тенантов.
+#   core ({{ core_ip }}) — пары Asterisk тенантов и операторы (внутренняя сеть).
+#
 # Входящий звонок: провайдер → DID → набор dispatcher тенанта (алгоритм 8,
 # приоритет ЦОД 1) → Asterisk. Отказ узла → ds_mark_dst + ds_next_dst().
-# Регистратор операторов (WSS) добавляется на этапе 3.
+# Операторы: регистрация (UDP или WSS) только из внутренней сети, пароль —
+# из базы тенанта; Asterisk звонит оператору через этот SBC.
 
 ####### Определения #######
 #!define EDGE_IP "{{ edge_ip }}"
 #!define CORE_IP "{{ core_ip }}"
+# Пароли к БД — отдельным файлом (DBURL, SQLCON_<тенант>), права 0640.
+include_file "/etc/kamailio/secrets.cfg"
 
 ####### Глобальные параметры #######
 debug={{ kamailio_debug }}
@@ -32,8 +36,21 @@ server_header="Server: pbx-sbc"
 
 listen=udp:{{ edge_ip }}:5060
 listen=udp:{{ core_ip }}:5060
+# WSS (и HTTPS для принятия сертификата браузером) — только во внутренней сети.
+listen=tls:{{ core_ip }}:{{ kamailio_wss_port }}
+
+enable_tls=yes
+tcp_accept_no_cl=yes
+tcp_connection_lifetime=3605
+tcp_keepalive=yes
+
+# Домены операторов тенантов — «свои» для Kamailio.
+{% for code, t in tenants_all | dictsort if t.enabled %}
+alias="{{ t.operators.sip_domain }}"
+{% endfor %}
 
 ####### Модули #######
+loadmodule "tls.so"
 loadmodule "jsonrpcs.so"
 loadmodule "kex.so"
 loadmodule "corex.so"
@@ -52,8 +69,18 @@ loadmodule "cfgutils.so"
 loadmodule "permissions.so"
 loadmodule "dispatcher.so"
 loadmodule "rtpengine.so"
+loadmodule "db_postgres.so"
+loadmodule "sqlops.so"
+loadmodule "usrloc.so"
+loadmodule "registrar.so"
+loadmodule "auth.so"
+loadmodule "nathelper.so"
+loadmodule "xhttp.so"
+loadmodule "websocket.so"
 
 ####### Параметры модулей #######
+modparam("tls", "config", "/etc/kamailio/tls.cfg")
+
 modparam("jsonrpcs", "pretty_format", 1)
 
 modparam("tm", "failure_reply_mode", 3)
@@ -81,10 +108,37 @@ modparam("dispatcher", "ds_ping_reply_codes", "class=2;code=404")
 
 modparam("rtpengine", "rtpengine_sock", "udp:127.0.0.1:{{ rtpengine_ng_port | default(2223) }}")
 
+# Регистрации операторов — в базе kamailio (кэш в памяти, запись раз в timer_interval).
+# Если при старте PostgreSQL недоступен, обёртка запуска (pbx-kamailio-start)
+# задаёт NO_LOCATION_DB: SBC стартует, регистрации — только в памяти.
+#!ifdef NO_LOCATION_DB
+modparam("usrloc", "db_mode", 0)
+#!else
+modparam("usrloc", "db_url", DBURL)
+modparam("usrloc", "db_mode", 2)
+#!endif
+modparam("usrloc", "use_domain", 1)
+modparam("usrloc", "timer_interval", 30)
+modparam("registrar", "min_expires", 60)
+modparam("registrar", "default_expires", 600)
+modparam("registrar", "max_expires", 3600)
+modparam("registrar", "received_avp", "$avp(RECEIVED)")
+modparam("nathelper", "received_avp", "$avp(RECEIVED)")
+
+# Пароли операторов — из базы своего тенанта, только чтение (представление sip_operator_auth).
+{% for code, t in tenants_all | dictsort if t.enabled %}
+modparam("sqlops", "sqlcon", SQLCON_{{ code }})
+{% endfor %}
+# Недоступная БД не мешает старту: без неё не пройдёт только регистрация операторов.
+modparam("sqlops", "connect_mode", 1)
+
+modparam("websocket", "keepalive_mechanism", 1)
+
 ####### Маршрутизация #######
 
 request_route {
 	route(REQINIT);
+	route(WEBSOCKET_NAT);
 
 	if (is_method("CANCEL")) {
 		if (t_check_trans()) {
@@ -111,11 +165,18 @@ request_route {
 		exit;
 	}
 
+	if (is_method("REGISTER")) {
+		route(REGISTRAR);
+	}
+
 	if (allow_source_address("{{ kamailio_addr_group_providers }}")) {
 		route(FROM_PROVIDER);
 	}
 	if (allow_source_address("{{ kamailio_addr_group_pbx }}")) {
 		route(FROM_PBX);
+	}
+	if (allow_source_address("{{ kamailio_addr_group_operators }}")) {
+		route(FROM_OPERATOR);
 	}
 
 	xlog("L_WARN", "отклонён $rm от неизвестного источника $si:$sp\n");
@@ -134,12 +195,28 @@ route[REQINIT] {
 	}
 }
 
+# Клиенты WebRTC (браузер) — по WebSocket: их Contact недоступен напрямую,
+# отвечаем через то же соединение (received / alias).
+route[WEBSOCKET_NAT] {
+	if (nat_uac_test("64")) {
+		force_rport();
+		if (is_method("REGISTER")) {
+			fix_nated_register();
+		} else if (!has_totag()) {
+			add_contact_alias();
+		}
+	}
+}
+
 # Запросы внутри диалога (BYE, re-INVITE, ACK) — по Route-заголовкам.
 route[WITHINDLG] {
 	if (!has_totag()) return;
 
 	if (loose_route()) {
-		route(RTPE_DIRECTION);
+		if (!isdsturiset()) {
+			handle_ruri_alias();
+		}
+		route(RTPE_INDIALOG);
 		if (is_method("BYE")) {
 			rtpengine_delete();
 		}
@@ -158,22 +235,55 @@ route[WITHINDLG] {
 	exit;
 }
 
-# Направление медиа для rtpengine — по интерфейсу, на который пришёл запрос.
+####### Медиа (rtpengine) #######
 # rtpengine читает пару direction в порядке движения ТЕКУЩЕГО сообщения:
 # offer идёт от вызывающего к вызываемому, answer — обратно.
-route[RTPE_DIRECTION] {
-	if ($Ri == EDGE_IP) {
+
+route[RTPE_EDGE_TO_CORE] {
+	$avp(rtpe_offer) = "direction=edge direction=core ICE=remove";
+	$avp(rtpe_answer) = "direction=core direction=edge ICE=remove";
+}
+
+route[RTPE_CORE_TO_EDGE] {
+	$avp(rtpe_offer) = "direction=core direction=edge ICE=remove";
+	$avp(rtpe_answer) = "direction=edge direction=core ICE=remove";
+}
+
+# Asterisk → оператор по WebRTC (DTLS-SRTP, ICE) и обратно.
+route[RTPE_RTP_TO_WEBRTC] {
+	$avp(rtpe_offer) = "direction=core direction=core ICE=force RTP/SAVPF rtcp-mux-offer generate-mid DTLS=passive SDES-off";
+	$avp(rtpe_answer) = "direction=core direction=core ICE=remove RTP/AVP rtcp-mux-demux";
+}
+
+route[RTPE_WEBRTC_TO_RTP] {
+	$avp(rtpe_offer) = "direction=core direction=core ICE=remove RTP/AVP rtcp-mux-demux";
+	$avp(rtpe_answer) = "direction=core direction=core ICE=force RTP/SAVPF rtcp-mux-offer generate-mid DTLS=passive SDES-off";
+}
+
+# Asterisk ↔ оператор с обычным SIP-телефоном (UDP).
+route[RTPE_CORE_TO_CORE] {
+	$avp(rtpe_offer) = "direction=core direction=core ICE=remove";
+	$avp(rtpe_answer) = "direction=core direction=core ICE=remove";
+}
+
+# Тип диалога запомнен в параметре Record-Route при начальном INVITE.
+route[RTPE_INDIALOG] {
+	if (check_route_param("ops=ws")) {
+		if (nat_uac_test("64")) {
+			route(RTPE_WEBRTC_TO_RTP);
+		} else {
+			route(RTPE_RTP_TO_WEBRTC);
+		}
+	} else if (check_route_param("ops=udp")) {
+		route(RTPE_CORE_TO_CORE);
+	} else if ($Ri == EDGE_IP) {
 		route(RTPE_EDGE_TO_CORE);
 	} else {
-		$avp(rtpe_offer) = "direction=core direction=edge";
-		$avp(rtpe_answer) = "direction=edge direction=core";
+		route(RTPE_CORE_TO_EDGE);
 	}
 }
 
-route[RTPE_EDGE_TO_CORE] {
-	$avp(rtpe_offer) = "direction=edge direction=core";
-	$avp(rtpe_answer) = "direction=core direction=edge";
-}
+####### Провайдер → Asterisk тенанта #######
 
 route[FROM_PROVIDER] {
 	if (!is_method("INVITE")) {
@@ -204,12 +314,6 @@ route[FROM_PROVIDER] {
 	route(RELAY);
 }
 
-# Начальные запросы от Asterisk (звонки операторам) — этап 3.
-route[FROM_PBX] {
-	sl_send_reply("501", "Not Implemented");
-	exit;
-}
-
 # Формат номера от провайдера уточняется (docs/placeholders.md): пока только «+».
 route[NORMALIZE_DID] {
 	if ($rU =~ "^\+") {
@@ -217,10 +321,106 @@ route[NORMALIZE_DID] {
 	}
 }
 
+####### Asterisk → оператор #######
+# Asterisk тенанта звонит на sip:<номер>@<SBC>. Домен берётся по адресу Asterisk,
+# поэтому Asterisk одного тенанта не может позвонить оператору другого.
+
+route[FROM_PBX] {
+	if (!is_method("INVITE")) {
+		sl_send_reply("405", "Method Not Allowed");
+		exit;
+	}
+
+	route(PBX_TENANT);
+	if ($var(pdomain) == "" || !($rU =~ "^[0-9]{2,8}$")) {
+		xlog("L_WARN", "от Asterisk $si: неизвестный тенант или номер $rU\n");
+		sl_send_reply("403", "Forbidden");
+		exit;
+	}
+
+	$ru = "sip:" + $rU + "@" + $var(pdomain);
+	if (!lookup("location")) {
+		xlog("L_INFO", "оператор $rU@$rd не зарегистрирован\n");
+		sl_send_reply("480", "Temporarily Unavailable");
+		exit;
+	}
+
+	record_route();
+	if ($du =~ "transport=ws" || $ru =~ "transport=ws") {
+		add_rr_param(";ops=ws");
+		route(RTPE_RTP_TO_WEBRTC);
+	} else {
+		add_rr_param(";ops=udp");
+		route(RTPE_CORE_TO_CORE);
+	}
+	xlog("L_INFO", "звонок оператору $tU → $ru ($du)\n");
+	route(RELAY);
+}
+
+# Начальные запросы операторов (кроме REGISTER): звонки с рабочего места — этап 4.
+route[FROM_OPERATOR] {
+	sl_send_reply("501", "Not Implemented");
+	exit;
+}
+
+####### Регистратор операторов #######
+
+route[REGISTRAR] {
+	if ($Ri != CORE_IP || !allow_source_address("{{ kamailio_addr_group_operators }}")) {
+		xlog("L_WARN", "REGISTER не из сети операторов: $si на $Ri\n");
+		sl_send_reply("403", "Forbidden");
+		exit;
+	}
+
+	route(OPERATOR_TENANT);
+	if ($var(otenant) == "") {
+		xlog("L_NOTICE", "REGISTER на неизвестный домен $td от $si\n");
+		sl_send_reply("403", "Forbidden");
+		exit;
+	}
+
+	route(OPERATOR_AUTH);
+
+	# Одно устройство на оператора: новая регистрация заменяет прежнюю.
+	if (!save("location", "0x04")) {
+		sl_reply_error();
+	}
+	exit;
+}
+
+# Проверка пароля оператора. Заменяемый блок: сейчас пароль из базы тенанта,
+# в проде — SSO/AD с временными учётными данными (auth_ephemeral), см. docs/placeholders.md.
+route[OPERATOR_AUTH] {
+	if (!is_present_hf("Authorization")) {
+		auth_challenge("$td", "1");
+		exit;
+	}
+	if ($au != $tU || !($au =~ "^[0-9]{2,8}$")) {
+		xlog("L_WARN", "REGISTER: логин $au не совпадает с $tU ($si)\n");
+		sl_send_reply("403", "Forbidden");
+		exit;
+	}
+
+	route(OPERATOR_PASSWORD);
+	if ($xavp(op=>password) == $null) {
+		xlog("L_NOTICE", "REGISTER: нет оператора $au@$td ($si)\n");
+		auth_challenge("$td", "1");
+		exit;
+	}
+	if (!pv_auth_check("$td", "$xavp(op=>password)", "0", "1")) {
+		xlog("L_NOTICE", "REGISTER: неверный пароль $au@$td ($si)\n");
+		auth_challenge("$td", "1");
+		exit;
+	}
+	consume_credentials();
+}
+
+####### Общие #######
+
 route[RELAY] {
 	if (is_method("INVITE|UPDATE")) {
 		if (has_body("application/sdp")) {
-			if (!rtpengine_offer("$avp(rtpe_offer) replace-origin replace-session-connection ICE=remove")) {
+			if (!rtpengine_offer("$avp(rtpe_offer) replace-origin replace-session-connection")) {
 				xlog("L_ERR", "rtpengine недоступен: $rm $ru\n");
 				if (!has_totag()) {
 					# Без медиапрокси звонок будет без звука — лучше явный отказ.
@@ -238,8 +438,11 @@ route[RELAY] {
 }
 
 onreply_route[MANAGE_REPLY] {
+	if (nat_uac_test("64")) {
+		add_contact_alias();
+	}
 	if (has_body("application/sdp")) {
-		rtpengine_answer("$avp(rtpe_answer) replace-origin replace-session-connection ICE=remove");
+		rtpengine_answer("$avp(rtpe_answer) replace-origin replace-session-connection");
 	}
 }
 
@@ -260,6 +463,27 @@ failure_route[DISPATCH_FAILURE] {
 		}
 	}
 	rtpengine_delete();
+}
+
+####### HTTP(S) и WebSocket (WSS для операторов) #######
+
+event_route[xhttp:request] {
+	set_reply_close();
+	set_reply_no_connect();
+
+	if ($Rp != {{ kamailio_wss_port }} || !allow_source_address("{{ kamailio_addr_group_operators }}")) {
+		xhttp_reply("403", "Forbidden", "", "");
+		exit;
+	}
+
+	if ($hdr(Upgrade) =~ "websocket" && $hdr(Connection) =~ "Upgrade" && $rm =~ "GET") {
+		if (ws_handle_handshake()) {
+			exit;
+		}
+	}
+
+	# Простая страница: чтобы браузер принял сертификат стенда (https://...:{{ kamailio_wss_port }}).
+	xhttp_reply("200", "OK", "text/html", "<html><body>pbx-sbc: WSS для операторов</body></html>");
 }
 
 include_file "/etc/kamailio/tenants.cfg"

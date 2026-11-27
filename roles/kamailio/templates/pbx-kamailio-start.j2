@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# Запуск Kamailio: если PostgreSQL недоступен, SBC всё равно стартует
+# (звонки провайдера не зависят от БД), регистрации операторов — только в памяти.
+# После возврата БД — перезапустить Kamailio, чтобы регистрации снова писались в базу.
+set -u
+extra=()
+if ! timeout 3 bash -c "</dev/tcp/{{ pbx_db_host }}/5432" 2>/dev/null; then
+  echo "WARNING: PostgreSQL {{ pbx_db_host }}:5432 недоступен — регистрации операторов только в памяти (NO_LOCATION_DB)" >&2
+  logger -t kamailio -p local0.warning "PostgreSQL {{ pbx_db_host }}:5432 недоступен при старте: регистрации только в памяти"
+  extra=(-A NO_LOCATION_DB)
+fi
+exec /usr/sbin/kamailio "$@" "${extra[@]}"

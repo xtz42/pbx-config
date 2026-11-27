@@ -17,3 +17,39 @@ route[DID_TO_TENANT] {
 {% endfor %}
 	}
 }
+
+# Адрес Asterisk → домен операторов его тенанта (изоляция звонков операторам).
+route[PBX_TENANT] {
+	$var(pdomain) = "";
+	switch ($si) {
+{% for host in groups['pbx'] | default([]) if tenants_all[hostvars[host].tenant].enabled %}
+		case "{{ hostvars[host].core_ip }}":   # {{ host }}
+			$var(pdomain) = "{{ tenants_all[hostvars[host].tenant].operators.sip_domain }}";
+			break;
+{% endfor %}
+	}
+}
+
+# Домен регистрации оператора → тенант.
+route[OPERATOR_TENANT] {
+	$var(otenant) = "";
+	switch ($td) {
+{% for code, t in tenants_all | dictsort if t.enabled %}
+		case "{{ t.operators.sip_domain }}":
+			$var(otenant) = "{{ code }}";
+			break;
+{% endfor %}
+	}
+}
+
+# Пароль оператора из базы его тенанта → $xavp(op=>password).
+route[OPERATOR_PASSWORD] {
+	$xavp(op) = $null;
+	switch ($var(otenant)) {
+{% for code, t in tenants_all | dictsort if t.enabled %}
+		case "{{ code }}":
+			sql_xquery("{{ code }}", "select password from sip_operator_auth where username = '$(au{s.escape.common})'", "op");
+			break;
+{% endfor %}
+	}
+}
