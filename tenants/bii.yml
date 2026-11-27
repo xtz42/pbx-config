@@ -1,0 +1,37 @@
+---
+# BI Innovations — пилотный тенант. Структура полей — см. tenants/_template.yml.
+# Все номера синтетические.
+
+tenant:
+  code: bii
+  name: "BI Innovations"
+  enabled: true
+  pilot: true
+
+  timezone: Asia/Almaty
+  languages: [ru, kk]
+
+  sbc:
+    dispatcher_setid: 1
+    dids:
+      - "70000000001"   # основная линия
+      - "70000000002"   # вторая линия (другая очередь/график — задаётся в did_routes)
+      - "70000000003"   # резервный номер для тестов чёрного списка и нерабочего времени
+
+  operators:
+    sip_domain: bii.pbx.test
+    extensions: "1000-1999"
+
+  db:
+    name: bii
+    user: bii_asterisk
+
+  recordings:
+    enabled: true
+    local_dir: /var/spool/asterisk/monitor
+    smb_share: "//smb.example.test/recordings/bii"   # плейсхолдер
+    smb_user: "svc-rec-bii"                           # плейсхолдер
+    keep_local_days: 3
+
+  dialplan:
+    custom: true   # extensions.d/tenant-bii.conf

@@ -1,0 +1,71 @@
+---
+# Шаблон описания тенанта. Новый тенант:
+#   1. cp tenants/_template.yml tenants/<код>.yml и заполнить;
+#   2. добавить две ВМ pbx-<код>-1 (группа dc1) и pbx-<код>-2 (группа dc2)
+#      в группу pbx нужного инвентаря с переменной tenant: <код>;
+#   3. добавить секреты тенанта в group_vars/all.vault.yml (см. ниже);
+#   4. маршруты DID, графики, операторы, очереди — строками в базе тенанта.
+# Код движка диалплана при этом не меняется (ADR 0003).
+#
+# Чего здесь НЕТ намеренно:
+#   - хостов и адресов — они в инвентаре (одинаковый файл тенанта для vagrant/test/prod);
+#   - секретов — они в group_vars/all.vault.yml:
+#       vault_tenant_secrets:
+#         <код>:
+#           db_password: ...     # пользователь Asterisk в базе тенанта
+#           smb_password: ...    # учётная запись SMB-папки записей
+#   - поведения DID (график, меню, очередь) — оно в таблице did_routes (ADR 0002).
+
+tenant:
+  # Код: 2–8 символов [a-z0-9]. Используется как имя базы PostgreSQL,
+  # префикс контекстов диалплана, каталогов записей и звуков (sounds/tenants/<код>/).
+  code: example
+  # Человекочитаемое имя (для документации и отчётов).
+  name: "Example Tenant"
+  # false — тенант описан, но SBC не маршрутизирует на него звонки.
+  enabled: false
+  pilot: false
+
+  # Часовой пояс графиков работы. С 01.03.2024 весь Казахстан — UTC+5,
+  # tzdata AlmaLinux 9 это учитывает.
+  timezone: Asia/Almaty
+  # Языки звуков; первый — язык по умолчанию. Каталоги: sounds/common/<язык>/.
+  languages: [ru, kk]
+
+  sbc:
+    # Номер набора dispatcher в Kamailio. Уникален среди всех тенантов.
+    dispatcher_setid: 99
+    # DID, которые SBC направляет этому тенанту (принадлежность DID).
+    # Формат — как приходит от провайдера (уточнить, см. docs/placeholders.md).
+    # Только синтетические номера вне инвентаря prod.
+    dids:
+      - "70000000099"
+
+  operators:
+    # SIP-домен регистрации операторов на Kamailio (WebRTC через WSS).
+    # Отделяет регистрации тенантов друг от друга. Плейсхолдер для стендов.
+    sip_domain: example.pbx.test
+    # Диапазон внутренних номеров операторов. Пересечения между тенантами
+    # допустимы — контексты изолированы, — но домены должны различаться.
+    extensions: "1000-1999"
+
+  db:
+    # База и пользователь в общем кластере PostgreSQL (хост — в инвентаре).
+    name: example
+    user: example_asterisk
+
+  recordings:
+    enabled: true
+    # Сначала запись на локальный диск ноды Asterisk...
+    local_dir: /var/spool/asterisk/monitor
+    # ...затем перенос в SMB-папку тенанта (move-recordings.sh).
+    # На Vagrant вместо SMB — локальная папка (см. inventory/vagrant).
+    smb_share: "//smb.example.test/recordings/example"   # плейсхолдер
+    smb_user: "svc-rec-example"                           # плейсхолдер
+    # Сколько дней хранить уже перенесённые записи на локальном диске.
+    keep_local_days: 3
+
+  dialplan:
+    # true — подключается roles/asterisk/templates/extensions.d/tenant-<код>.conf
+    # с особой логикой тенанта поверх универсального движка.
+    custom: false
