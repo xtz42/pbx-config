@@ -1,0 +1,21 @@
+# Все текстовые файлы — с LF, независимо от ОС автора (в т.ч. Windows-хост для Vagrant).
+* text=auto eol=lf
+
+# Командные файлы Windows должны оставаться с CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Звуки Asterisk — через Git LFS.
+*.wav   filter=lfs diff=lfs merge=lfs -text
+*.gsm   filter=lfs diff=lfs merge=lfs -text
+# Другие форматы звуков Asterisk, если появятся, — тоже в LFS.
+*.ulaw  filter=lfs diff=lfs merge=lfs -text
+*.alaw  filter=lfs diff=lfs merge=lfs -text
+*.g722  filter=lfs diff=lfs merge=lfs -text
+*.sln16 filter=lfs diff=lfs merge=lfs -text
+
+# Прочие бинарные файлы.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.rpm binary

@@ -1,0 +1,52 @@
+# Vagrant
+.vagrant/
+*.box
+
+# Ansible
+*.retry
+.ansible/
+# Пароль от Ansible Vault никогда не кладётся в репозиторий
+.vault_pass*
+.vault-pass*
+vault-password*
+vault_password*
+
+# Ключи и сертификаты: на стенде генерируются при провижининге,
+# в проде — из Ansible Vault
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+
+# Артефакты сборки и CI
+build/
+dist/
+ci/out/
+rpm/BUILD/
+rpm/BUILDROOT/
+rpm/RPMS/
+rpm/SRPMS/
+rpm/SOURCES/*.tar.gz
+
+# Python (Alembic, линтеры)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Логи, дампы, записи разговоров — никогда не коммитим
+*.log
+*.pcap
+*.sql.gz
+*.dump
+recordings/
+
+# Редакторы и ОС
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
