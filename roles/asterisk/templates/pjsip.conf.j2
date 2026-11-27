@@ -1,0 +1,47 @@
+; {{ ansible_managed }}
+; PJSIP: Asterisk {{ inventory_hostname }} принимает звонки только от SBC
+; по сети voice-core. Операторы (PJSIP realtime из PostgreSQL) — этап 3.
+
+[global]
+type = global
+user_agent = pbx-{{ tenants_current.code }}
+endpoint_identifier_order = ip,username
+
+[system]
+type = system
+timer_t1 = 500
+timer_b = 32000
+
+[transport-core-udp]
+type = transport
+protocol = udp
+bind = {{ core_ip }}:5060
+tos = cs3
+allow_reload = no
+
+; --- SBC (Kamailio): входящие звонки провайдера -------------------------
+[sbc]
+type = endpoint
+transport = transport-core-udp
+context = from-sbc
+disallow = all
+allow = {{ asterisk_codecs | join(',') }}
+direct_media = no
+dtmf_mode = rfc4733
+language = {{ tenants_current.languages[0] }}
+aors = sbc
+send_pai = no
+trust_id_inbound = yes
+
+[sbc]
+type = aor
+{% for host in groups['sbc'] | default([]) %}
+contact = sip:{{ hostvars[host].core_ip }}:5060
+{% endfor %}
+
+[sbc]
+type = identify
+endpoint = sbc
+{% for host in groups['sbc'] | default([]) %}
+match = {{ hostvars[host].core_ip }}
+{% endfor %}

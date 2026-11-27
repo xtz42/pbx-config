@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: pbx-config
+  description: Asterisk 22 LTS — одна роль для всех тенантов
+  license: proprietary
+  min_ansible_version: "2.17"
+  platforms:
+    - name: EL
+      versions: ["9"]
+dependencies: []

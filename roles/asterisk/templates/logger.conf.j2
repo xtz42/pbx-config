@@ -1,0 +1,11 @@
+; {{ ansible_managed }}
+
+[general]
+dateformat = %F %T.%3q
+use_callids = yes
+appendhostname = no
+
+[logfiles]
+console => notice,warning,error
+messages.log => notice,warning,error,verbose(3)
+security.log => security

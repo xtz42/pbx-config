@@ -1,0 +1,30 @@
+---
+# Исходники RPM (rpm/asterisk.spec). При смене версии в spec — обновить и суммы.
+asterisk_sources:
+  - url: https://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-22.12.0.tar.gz
+    sha256: f8b2ba98aac6c4ff3376bc0a2868bea6ed577ca684efb7ec739ae6e8ce6e35e2
+  - url: https://raw.githubusercontent.com/asterisk/third-party/master/pjproject/2.17/pjproject-2.17.tar.bz2
+    sha256: 04b2eb1f0f01aa0ad1945b167171843448a51aa6b7c3e806496d434f13a112b7
+
+asterisk_verbose: 3
+asterisk_rtp_start: 10000
+asterisk_rtp_end: 20000
+asterisk_codecs: [alaw, ulaw]
+
+# Основные конфиги (templates/ → /etc/asterisk/).
+asterisk_config_files:
+  - asterisk.conf
+  - modules.conf
+  - logger.conf
+  - indications.conf
+  - rtp.conf
+  - pjsip.conf
+  - extensions.conf
+
+# Файлы диалплана (templates/extensions.d/ → /etc/asterisk/extensions.d/).
+# Особая логика тенанта (tenant-<код>.conf) подключается, если в
+# tenants/<код>.yml dialplan.custom: true.
+asterisk_dialplan_files:
+  - inbound-engine.conf
+
+asterisk_firewall_manage: "{{ base_manage_os | default(false) }}"

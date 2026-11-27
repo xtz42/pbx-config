@@ -1,0 +1,19 @@
+; {{ ansible_managed }}
+; Диалплан тенанта {{ tenants_current.code }}. Код движка общий для всех тенантов
+; (extensions.d/), различаются только глобальные переменные ниже и данные в БД.
+
+[general]
+static = yes
+writeprotect = yes
+clearglobalvars = yes
+
+[globals]
+TENANT = {{ tenants_current.code }}
+DEFAULT_LANGUAGE = {{ tenants_current.languages[0] }}
+
+{% for f in asterisk_dialplan_files %}
+#include extensions.d/{{ f }}
+{% endfor %}
+{% if tenants_current.dialplan.custom %}
+#include extensions.d/tenant-{{ tenants_current.code }}.conf
+{% endif %}

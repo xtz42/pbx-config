@@ -1,0 +1,58 @@
+---
+- name: Пакет Asterisk
+  ansible.builtin.include_role:
+    name: rpm_package
+  vars:
+    rpm_package_name: asterisk
+    rpm_package_spec: rpm/asterisk.spec
+    rpm_package_local_sources:
+      - rpm/asterisk.service
+    rpm_package_remote_sources: "{{ asterisk_sources }}"
+
+- name: Каталог диалплана
+  ansible.builtin.file:
+    path: /etc/asterisk/extensions.d
+    state: directory
+    owner: root
+    group: asterisk
+    mode: "0750"
+
+- name: Конфигурация Asterisk
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/asterisk/{{ item }}"
+    owner: root
+    group: asterisk
+    mode: "0640"
+  loop: "{{ asterisk_config_files }}"
+  notify: Restart asterisk
+
+- name: Диалплан
+  ansible.builtin.template:
+    src: "extensions.d/{{ item }}.j2"
+    dest: "/etc/asterisk/extensions.d/{{ item }}"
+    owner: root
+    group: asterisk
+    mode: "0640"
+  loop: "{{ asterisk_dialplan_files + (['tenant-' ~ tenants_current.code ~ '.conf'] if tenants_current.dialplan.custom else []) }}"
+  notify: Reload asterisk
+
+- name: SIP и RTP в firewalld (только voice-core)
+  ansible.posix.firewalld:
+    zone: voice-core
+    port: "{{ item }}"
+    state: enabled
+    permanent: true
+    immediate: true
+  loop:
+    - 5060/udp
+    - "{{ asterisk_rtp_start }}-{{ asterisk_rtp_end }}/udp"
+  when: asterisk_firewall_manage | bool
+  tags: [firewall]
+
+- name: Запустить Asterisk
+  ansible.builtin.systemd_service:
+    name: asterisk
+    state: started
+    enabled: true
+  tags: [systemd]

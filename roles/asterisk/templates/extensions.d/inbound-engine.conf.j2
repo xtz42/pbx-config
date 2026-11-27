@@ -1,0 +1,18 @@
+; {{ ansible_managed }}
+; Универсальный входящий движок.
+;
+; Этап 2 — заглушка: ответить и проиграть приветствие тенанта.
+; Этап 4 — маршрут из did_routes, график, праздники, чёрный список,
+;          меню, очередь (см. tests/calls/bii.md).
+
+[from-sbc]
+; Звонки провайдера через SBC. ${EXTEN} — DID (Kamailio уже нормализовал номер).
+exten => _X.,1,NoOp(Входящий: DID ${EXTEN}, CallerID ${CALLERID(num)}, тенант ${TENANT})
+ same => n,Goto(engine-inbound,${EXTEN},1)
+
+[engine-inbound]
+exten => _X.,1,Set(CHANNEL(language)=${DEFAULT_LANGUAGE})
+ same => n,Answer()
+ same => n,Wait(0.5)
+ same => n,Playback(tenants/${TENANT}/welcome)
+ same => n,Hangup()

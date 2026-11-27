@@ -1,0 +1,50 @@
+; {{ ansible_managed }}
+; Загружаются все собранные модули, кроме перечисленных ниже:
+; лишнее не загружаем — меньше поверхность атаки и шума в логах.
+
+[modules]
+autoload = yes
+
+; Каналы и протоколы, которые не используются
+noload => chan_audiosocket.so
+noload => app_audiosocket.so
+noload => res_audiosocket.so
+noload => pbx_dundi.so
+
+; Диалплан только в extensions.conf (не AEL, не realtime-диалплан)
+noload => pbx_ael.so
+noload => res_ael_share.so
+noload => pbx_realtime.so
+
+; Хранилища, которые не используются (данные — в PostgreSQL через ODBC)
+noload => res_config_sqlite3.so
+noload => res_config_curl.so
+noload => cdr_sqlite3_custom.so
+noload => cel_sqlite3_custom.so
+noload => cdr_custom.so
+noload => cel_custom.so
+noload => res_cdrel_custom.so
+noload => cdr_odbc.so
+
+; Мониторинг/трассировка — вне текущего объёма
+noload => res_hep.so
+noload => res_hep_pjsip.so
+noload => res_hep_rtcp.so
+noload => res_prometheus.so
+noload => res_statsd.so
+
+; Прочее ненужное
+noload => res_calendar.so
+noload => res_smdi.so
+noload => res_adsi.so
+noload => app_adsiprog.so
+noload => app_getcpeid.so
+noload => app_festival.so
+noload => app_mp3.so
+noload => app_sms.so
+noload => app_minivm.so
+noload => app_zapateller.so
+noload => app_alarmreceiver.so
+noload => res_aeap.so
+noload => res_speech_aeap.so
+noload => res_pjsip_config_wizard.so

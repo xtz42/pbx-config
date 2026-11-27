@@ -1,0 +1,16 @@
+; {{ ansible_managed }}
+; Тональные сигналы Казахстана (как в РФ: 425 Гц).
+
+[general]
+country = kz
+
+[kz]
+description = Kazakhstan
+ringcadence = 1000,4000
+dial = 425
+busy = 425/350,0/350
+ring = 425/1000,0/4000
+congestion = 425/175,0/175
+callwaiting = 425/200,0/5000
+record = 1400/400,0/15000
+info = 950/330,1400/330,1800/330,0/1000

@@ -1,0 +1,28 @@
+; {{ ansible_managed }}
+; Asterisk {{ inventory_hostname }}, тенант {{ tenants_current.code }} ({{ tenants_current.name }})
+
+[directories](!)
+astetcdir => /etc/asterisk
+astmoddir => /usr/lib64/asterisk/modules
+astvarlibdir => /var/lib/asterisk
+astdbdir => /var/lib/asterisk
+astkeydir => /var/lib/asterisk
+astdatadir => /var/lib/asterisk
+astagidir => /var/lib/asterisk/agi-bin
+astspooldir => /var/spool/asterisk
+astrundir => /run/asterisk
+astlogdir => /var/log/asterisk
+astsbindir => /usr/sbin
+
+[options]
+verbose = {{ asterisk_verbose }}
+debug = 0
+; Имя системы входит в uniqueid вызовов — по нему различаются ноды пары в CDR.
+systemname = {{ inventory_hostname }}
+defaultlanguage = {{ tenants_current.languages[0] }}
+documentation_language = en_US
+hideconnect = yes
+transmit_silence = yes
+; Asterisk запускается systemd от пользователя asterisk.
+runuser = asterisk
+rungroup = asterisk
