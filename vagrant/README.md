@@ -54,6 +54,12 @@ ssh -i .vagrant\machines\sbc\virtualbox\private_key -p 2222 -o StrictHostKeyChec
 
 ## Если что-то пошло не так
 
+- **Звонок получает `503 Service Unavailable`, в журнале Kamailio «нет доступных
+  узлов Asterisk», `kamcmd dispatcher.list` показывает `FLAGS: IP`.** Asterisk
+  поднялся позже Kamailio, и узел помечен неактивным; по ADR 0003 он вернётся сам
+  после 10 минут успешных проверок (20 × 30 с). Вернуть сразу (на sbc):
+  `sudo kamcmd dispatcher.set_state ap 1 sip:192.168.57.21:5060`.
+
 - **`[BUG] Segmentation fault` в `C:/Program Files/Vagrant/embedded/...`** —
   падает встроенный в Vagrant Ruby, ещё до чтения Vagrantfile. Наблюдалось на
   Windows-хосте случайным образом; причина вне репозитория (см. NET-475, этап 2).

@@ -14,6 +14,9 @@
 | 2.5 | Медиа идёт через rtpengine | В SDP для провайдера — 192.168.56.10, для Asterisk — 192.168.57.10 | `vagrant ssh sbc -c "sudo tcpdump -i any -nn -A -s0 udp port 5060"` → строки `c=IN IP4` в SDP |
 | 2.6 | Asterisk виден dispatcher | `pbx-bii-1` активен (FLAGS начинаются с `A`), PRIORITY 10 | `vagrant ssh sbc -c "sudo kamcmd dispatcher.list"` |
 
+Результат на стенде (Windows 11, VirtualBox 7.2, 2026-11-27): 2.1 — пройден
+(приветствие слышно в MicroSIP после возврата узла в dispatcher, см. vagrant/README.md).
+
 ## Этап 4 — универсальный входящий движок
 
 Дополняется на этапе 4: график и праздники, чёрный список, нерабочее
