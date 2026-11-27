@@ -7,7 +7,7 @@
 # на хосте (Windows) Ansible не нужен.
 #
 #   cd vagrant
-#   vagrant up                 # sbc и pbx-bii-1
+#   vagrant up                 # db, sbc и pbx-bii-1
 #   vagrant up provider        # необязательно: ВМ «провайдера» с SIPp
 #   vagrant provision <ВМ>     # повторная раскатка после изменений в репозитории
 #
@@ -20,6 +20,8 @@ Vagrant.require_version ">= 2.4.0"
 BOX = "almalinux/9"
 
 MACHINES = [
+  # Порядок важен: база — первой (её используют sbc и pbx-bii-1).
+  { name: "db",                               core: "192.168.57.30", memory: 1024 },
   { name: "sbc",       edge: "192.168.56.10", core: "192.168.57.10", memory: 1024 },
   { name: "pbx-bii-1",                        core: "192.168.57.21", memory: 1536 },
   # «Провайдер» (вместо транка Kcell): SIPp. Не стартует по умолчанию.
