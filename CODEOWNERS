@@ -1,0 +1,20 @@
+# Владельцы кода (синтаксис GitLab). Все группы — ПЛЕЙСХОЛДЕРЫ,
+# заменить на реальные при переносе на gitlab.com (docs/placeholders.md).
+# Правило, указанное ниже, имеет приоритет над указанным выше.
+
+*                         @CHANGE_ME_voip-team
+
+/roles/kamailio/          @CHANGE_ME_voip-team @CHANGE_ME_network-team
+/roles/rtpengine/         @CHANGE_ME_voip-team @CHANGE_ME_network-team
+/docs/network.md          @CHANGE_ME_network-team
+
+/roles/postgresql/        @CHANGE_ME_voip-team @CHANGE_ME_dba-team
+/db/                      @CHANGE_ME_voip-team @CHANGE_ME_dba-team
+
+/inventory/prod/          @CHANGE_ME_voip-leads
+/docs/decisions/          @CHANGE_ME_voip-leads
+
+/.gitlab-ci.yml           @CHANGE_ME_voip-team @CHANGE_ME_devops-team
+/ci/                      @CHANGE_ME_voip-team @CHANGE_ME_devops-team
+/.pre-commit-config.yaml  @CHANGE_ME_voip-team @CHANGE_ME_devops-team
+/.gitleaks.toml           @CHANGE_ME_voip-leads @CHANGE_ME_devops-team
