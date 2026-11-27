@@ -1,0 +1,5 @@
+# Инструменты миграций (Alembic для таблиц Asterisk). Ставятся ролью postgresql
+# в отдельное окружение /opt/pbx-db-migrate на сервере БД.
+alembic==1.20.1
+SQLAlchemy==2.1.8
+psycopg2-binary==2.9.13

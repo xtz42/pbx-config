@@ -2,6 +2,8 @@
 # Установка:  pip install pre-commit && pre-commit install
 # Прогон по всему репозиторию:  pre-commit run --all-files
 # Обновление версий хуков:  pre-commit autoupdate (отдельным MR)
+# Вендоренные файлы (Asterisk ast-db-manage, схема Kamailio) хранятся как в оригинале.
+exclude: '^db/(asterisk-alembic|kamailio)/'
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
