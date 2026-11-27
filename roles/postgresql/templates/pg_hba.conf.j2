@@ -1,0 +1,21 @@
+# {{ ansible_managed }}
+# Доступ строго по парам «база — пользователь — адрес» (изоляция тенантов).
+# TYPE  DATABASE  USER  ADDRESS  METHOD
+
+local   all       all                         peer
+host    all       all   127.0.0.1/32          scram-sha-256
+
+{% for code, t in tenants_all | dictsort if t.enabled %}
+# {{ code }}: Asterisk тенанта и Kamailio (чтение паролей операторов)
+{%   for host in groups['pbx'] | default([]) if hostvars[host].tenant == code %}
+host    {{ t.db.name }}  {{ t.db.user }}  {{ hostvars[host].core_ip }}/32  scram-sha-256
+{%   endfor %}
+{%   for host in groups['sbc'] | default([]) %}
+host    {{ t.db.name }}  {{ postgresql_kamailio_ro_user }}  {{ hostvars[host].core_ip }}/32  scram-sha-256
+{%   endfor %}
+{% endfor %}
+
+# Kamailio: регистрации операторов
+{% for host in groups['sbc'] | default([]) %}
+host    {{ postgresql_kamailio_db }}  {{ postgresql_kamailio_user }}  {{ hostvars[host].core_ip }}/32  scram-sha-256
+{% endfor %}

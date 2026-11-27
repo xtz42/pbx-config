@@ -1,0 +1,41 @@
+# {{ ansible_managed }}
+# Alembic Asterisk, дерево {{ item.1 }}, база {{ item.0.db.name }}.
+# Подключение — от postgres через локальный сокет, объекты создаются от роли-владельца.
+[alembic]
+# Относительный путь: env.py Asterisk строит из него имя таблицы версий
+# (alembic_version_<дерево>); запуск — из каталога asterisk-alembic.
+script_location = {{ item.1 }}
+sqlalchemy.url = postgresql+psycopg2:///{{ item.0.db.name }}?host=/run/postgresql&options=-c%%20role%%3D{{ item.0.db.name }}_owner
+
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARN
+handlers = console
+qualname =
+
+[logger_sqlalchemy]
+level = WARN
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %%(levelname)-5.5s [%%(name)s] %%(message)s

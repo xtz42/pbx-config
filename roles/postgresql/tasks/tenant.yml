@@ -1,0 +1,105 @@
+---
+# База тенанта tenant_item.code: роли, Alembic Asterisk, свои миграции, права.
+
+- name: "Роль-владелец базы: {{ tenant_item.code }}"
+  community.postgresql.postgresql_user:
+    name: "{{ tenant_item.db.name }}_owner"
+    role_attr_flags: NOLOGIN
+  become: true
+  become_user: postgres
+
+- name: "Пользователь Asterisk: {{ tenant_item.code }}"
+  community.postgresql.postgresql_user:
+    name: "{{ tenant_item.db.user }}"
+    password: "{{ vault_tenant_secrets[tenant_item.code].db_password }}"
+    role_attr_flags: LOGIN
+  no_log: true
+  become: true
+  become_user: postgres
+
+- name: "База: {{ tenant_item.code }}"
+  community.postgresql.postgresql_db:
+    name: "{{ tenant_item.db.name }}"
+    owner: "{{ tenant_item.db.name }}_owner"
+    encoding: UTF8
+  become: true
+  become_user: postgres
+
+- name: "Права по умолчанию для Asterisk: {{ tenant_item.code }}"
+  community.postgresql.postgresql_query:
+    login_db: "{{ tenant_item.db.name }}"
+    query: "{{ item }}"
+  loop:
+    - "REVOKE ALL ON DATABASE {{ tenant_item.db.name }} FROM PUBLIC"
+    - "GRANT CONNECT ON DATABASE {{ tenant_item.db.name }} TO {{ tenant_item.db.user }}, {{ postgresql_kamailio_ro_user }}"
+    - "GRANT USAGE ON SCHEMA public TO {{ tenant_item.db.user }}, {{ postgresql_kamailio_ro_user }}"
+    - >-
+      ALTER DEFAULT PRIVILEGES FOR ROLE {{ tenant_item.db.name }}_owner IN SCHEMA public
+      GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {{ tenant_item.db.user }}
+    - >-
+      ALTER DEFAULT PRIVILEGES FOR ROLE {{ tenant_item.db.name }}_owner IN SCHEMA public
+      GRANT USAGE, SELECT ON SEQUENCES TO {{ tenant_item.db.user }}
+    - >-
+      ALTER DEFAULT PRIVILEGES FOR ROLE {{ tenant_item.db.name }}_owner IN SCHEMA public
+      GRANT EXECUTE ON FUNCTIONS TO {{ tenant_item.db.user }}
+  loop_control:
+    label: "{{ item | truncate(60) }}"
+  changed_when: false
+  become: true
+  become_user: postgres
+
+- name: "Конфигурация Alembic: {{ tenant_item.code }}"
+  ansible.builtin.template:
+    src: alembic.ini.j2
+    dest: "/etc/pbx-db/{{ item.0.code }}-{{ item.1 }}.ini"
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  loop: "{{ [tenant_item] | product(postgresql_asterisk_alembic_trees) | list }}"
+  loop_control:
+    label: "{{ item.0.code }}-{{ item.1 }}"
+
+- name: "Таблицы Asterisk (alembic upgrade head): {{ tenant_item.code }}"
+  ansible.builtin.command:
+    cmd: "{{ postgresql_migrate_venv }}/bin/alembic -c /etc/pbx-db/{{ tenant_item.code }}-{{ item }}.ini upgrade head"
+    chdir: "{{ postgresql_db_dir }}/asterisk-alembic"
+  loop: "{{ postgresql_asterisk_alembic_trees }}"
+  register: _postgresql_alembic
+  changed_when: "'Running upgrade' in _postgresql_alembic.stderr"
+  become: true
+  become_user: postgres
+
+- name: "Свои миграции (db/migrations): {{ tenant_item.code }}"
+  ansible.builtin.command:
+    cmd: "{{ postgresql_db_dir }}/migrate.sh {{ tenant_item.db.name }} {{ tenant_item.db.name }}_owner"
+  register: _postgresql_migrate
+  changed_when: "'applied=0' not in _postgresql_migrate.stdout"
+  become: true
+  become_user: postgres
+
+- name: "Права на существующие объекты: {{ tenant_item.code }}"
+  community.postgresql.postgresql_query:
+    login_db: "{{ tenant_item.db.name }}"
+    query: "{{ item }}"
+  loop:
+    - "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {{ tenant_item.db.user }}"
+    - "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {{ tenant_item.db.user }}"
+    - "GRANT SELECT ON sip_operator_auth TO {{ postgresql_kamailio_ro_user }}"
+  loop_control:
+    label: "{{ item | truncate(60) }}"
+  changed_when: false
+  become: true
+  become_user: postgres
+
+- name: "Адрес SBC для звонков операторам: {{ tenant_item.code }}"
+  community.postgresql.postgresql_query:
+    login_db: "{{ tenant_item.db.name }}"
+    query: >-
+      INSERT INTO pbx_settings (key, value, comment)
+      VALUES ('sbc_address', %(addr)s, 'Ansible: адрес SBC во внутренней сети')
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    named_args:
+      addr: "{{ pbx_sbc_internal_address }}"
+  changed_when: false
+  become: true
+  become_user: postgres

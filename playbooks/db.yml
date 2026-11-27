@@ -1,5 +1,5 @@
 ---
-# PostgreSQL: базы тенантов, миграции. Наполняется на этапе 3.
+# PostgreSQL: общий кластер, база на тенанта, миграции, база Kamailio.
 - name: PostgreSQL
   hosts: db
   become: true
@@ -7,3 +7,5 @@
   roles:
     - role: base
       when: base_manage_os | bool
+    - role: tenants
+    - role: postgresql

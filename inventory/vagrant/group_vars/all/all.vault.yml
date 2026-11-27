@@ -3,8 +3,12 @@
 # В inventory/test и inventory/prod этот файл зашифрован Ansible Vault
 # (проверяется ci/check-vault-encrypted.sh).
 #
-# Структура — см. tenants/_template.yml. Заполняется на этапе 3.
+# Структура — см. tenants/_template.yml.
 vault_tenant_secrets:
   bii:
     db_password: "test-bii-db-only-for-vagrant"
     smb_password: "test-bii-smb-only-for-vagrant"
+
+# Kamailio: база регистраций и чтение паролей операторов из баз тенантов.
+vault_kamailio_db_password: "test-kamailio-db-only-for-vagrant"
+vault_kamailio_ro_password: "test-kamailio-ro-only-for-vagrant"

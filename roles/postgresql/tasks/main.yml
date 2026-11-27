@@ -1,0 +1,112 @@
+---
+- name: Пакеты PostgreSQL {{ postgresql_version }}
+  ansible.builtin.dnf:
+    name:
+      - "@postgresql:{{ postgresql_version }}/server"
+      - postgresql-contrib
+      - python3-psycopg2   # для модулей community.postgresql
+      - python3.12         # окружение Alembic
+      - acl                # become_user postgres
+    state: present
+
+- name: Инициализировать кластер
+  ansible.builtin.command: postgresql-setup --initdb
+  args:
+    creates: "{{ postgresql_data_dir }}/PG_VERSION"
+
+- name: Подключить conf.d в postgresql.conf
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_data_dir }}/postgresql.conf"
+    regexp: "^#?include_dir\\s*="
+    line: "include_dir = 'conf.d'"
+  notify: Restart postgresql
+
+- name: Каталог conf.d
+  ansible.builtin.file:
+    path: "{{ postgresql_data_dir }}/conf.d"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0700"
+
+- name: Параметры кластера
+  ansible.builtin.template:
+    src: 10-pbx.conf.j2
+    dest: "{{ postgresql_data_dir }}/conf.d/10-pbx.conf"
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  notify: Restart postgresql
+
+- name: Доступ (pg_hba.conf)
+  ansible.builtin.template:
+    src: pg_hba.conf.j2
+    dest: "{{ postgresql_data_dir }}/pg_hba.conf"
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  notify: Reload postgresql
+
+- name: Порт PostgreSQL в firewalld (voice-core)
+  ansible.posix.firewalld:
+    zone: voice-core
+    port: 5432/tcp
+    state: enabled
+    permanent: true
+    immediate: true
+  when: postgresql_firewall_manage | bool
+  tags: [firewall]
+
+- name: Запустить PostgreSQL
+  ansible.builtin.systemd_service:
+    name: postgresql
+    state: started
+    enabled: true
+  tags: [systemd]
+
+- name: Применить изменения конфигурации
+  ansible.builtin.meta: flush_handlers
+
+# rsync: copy по одному файлу на сотне миграций Alembic идёт минутами.
+- name: Копия db/ репозитория (миграции, схема Kamailio)
+  ansible.posix.synchronize:
+    src: "{{ postgresql_repo_root }}/db/"
+    dest: "{{ postgresql_db_dir }}/"
+    delete: true
+    recursive: true
+    perms: false
+    owner: false
+    group: false
+    rsync_opts:
+      - "--chmod=D0750,F0640"
+      - "--chown=root:postgres"
+      - "--exclude=__pycache__"
+
+- name: Права на скрипт миграций
+  ansible.builtin.file:
+    path: "{{ postgresql_db_dir }}/migrate.sh"
+    mode: "0750"
+
+- name: Окружение Alembic
+  ansible.builtin.pip:
+    requirements: "{{ postgresql_db_dir }}/requirements.txt"
+    virtualenv: "{{ postgresql_migrate_venv }}"
+    virtualenv_command: python3.12 -m venv
+
+- name: Каталог конфигурации миграций
+  ansible.builtin.file:
+    path: /etc/pbx-db
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0700"
+
+- name: База Kamailio
+  ansible.builtin.include_tasks: kamailio.yml
+
+- name: Базы тенантов
+  ansible.builtin.include_tasks: tenant.yml
+  loop: "{{ tenants_all | dict2items | map(attribute='value') | selectattr('enabled') | list }}"
+  loop_control:
+    loop_var: tenant_item
+    label: "{{ tenant_item.code }}"

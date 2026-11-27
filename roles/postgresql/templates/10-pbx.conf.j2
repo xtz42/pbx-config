@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+listen_addresses = 'localhost,{{ postgresql_listen }}'
+password_encryption = 'scram-sha-256'
+max_connections = 100
+log_timezone = '{{ base_timezone | default("Asia/Almaty") }}'
+timezone = '{{ base_timezone | default("Asia/Almaty") }}'
+log_line_prefix = '%m [%p] %q%u@%d '
+log_connections = on

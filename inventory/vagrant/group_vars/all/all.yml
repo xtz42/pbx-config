@@ -22,6 +22,17 @@ net_voice_core: 192.168.57.0/24
 rpm_source: build
 rpm_cache_dir: /vagrant/vagrant/cache/rpms
 
+# PostgreSQL (общий кластер). В проде — плейсхолдер (адрес кластера/VIP).
+pbx_db_host: 192.168.57.30
+# Адрес SBC во внутренней сети: через него Asterisk звонит операторам
+# (ps_aors.contact). В проде — общий внутренний адрес пары SBC (плейсхолдер).
+pbx_sbc_internal_address: "192.168.57.10:5060"
+
+# Откуда операторы регистрируются на Kamailio (внутренняя сеть, ADR/плейсхолдеры:
+# удалённые — через VPN). На стенде — сеть voice-core, включая хост 192.168.57.1.
+sbc_operator_networks:
+  - 192.168.57.0/24
+
 # Кто может присылать звонки на SBC как «провайдер» (вместо транка Kcell).
 sbc_providers:
   - name: host-softphone   # софтфон на хосте (Windows), адрес host-only адаптера

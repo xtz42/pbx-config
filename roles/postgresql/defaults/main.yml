@@ -1,0 +1,18 @@
+---
+# Поток модуля AppStream AlmaLinux 9.
+postgresql_version: "18"
+postgresql_data_dir: /var/lib/pgsql/data
+postgresql_listen: "{{ core_ip }}"
+postgresql_firewall_manage: "{{ base_manage_os | default(false) }}"
+
+# Копия каталога db/ репозитория на сервере БД и окружение инструментов миграций.
+postgresql_repo_root: "{{ inventory_dir | dirname | dirname }}"
+postgresql_db_dir: /opt/pbx-db
+postgresql_migrate_venv: /opt/pbx-db-migrate
+# Деревья Alembic Asterisk, которые применяются к базе тенанта.
+postgresql_asterisk_alembic_trees: [config, cdr, queue_log]
+
+# База регистраций Kamailio и пользователь только для чтения паролей операторов.
+postgresql_kamailio_db: kamailio
+postgresql_kamailio_user: kamailio
+postgresql_kamailio_ro_user: kamailio_ro

@@ -1,0 +1,45 @@
+---
+- name: Пользователи Kamailio
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    role_attr_flags: LOGIN
+  loop:
+    - name: "{{ postgresql_kamailio_user }}"
+      password: "{{ vault_kamailio_db_password }}"
+    - name: "{{ postgresql_kamailio_ro_user }}"
+      password: "{{ vault_kamailio_ro_password }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+  become: true
+  become_user: postgres
+
+- name: База регистраций Kamailio
+  community.postgresql.postgresql_db:
+    name: "{{ postgresql_kamailio_db }}"
+    owner: "{{ postgresql_kamailio_user }}"
+    encoding: UTF8
+  become: true
+  become_user: postgres
+
+- name: Есть ли схема Kamailio
+  community.postgresql.postgresql_query:
+    login_db: "{{ postgresql_kamailio_db }}"
+    query: "SELECT to_regclass('public.version') IS NOT NULL AS present"
+  register: _postgresql_kamailio_schema
+  changed_when: false
+  become: true
+  become_user: postgres
+
+- name: Создать схему Kamailio (version, location)
+  ansible.builtin.command:
+    cmd: >-
+      psql -X -q -v ON_ERROR_STOP=1 -1 -d {{ postgresql_kamailio_db }}
+      -c "SET ROLE {{ postgresql_kamailio_user }}"
+      -f {{ postgresql_db_dir }}/kamailio/standard-create.sql
+      -f {{ postgresql_db_dir }}/kamailio/usrloc-create.sql
+  when: not _postgresql_kamailio_schema.query_result[0].present
+  changed_when: true
+  become: true
+  become_user: postgres
