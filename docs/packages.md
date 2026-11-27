@@ -9,7 +9,7 @@
 
 | Пакет | Откуда | Версия |
 |-------|--------|--------|
-| kamailio, kamailio-utils | rpm.kamailio.org, репозиторий конкретного выпуска | 6.1.5 |
+| kamailio, kamailio-utils, kamailio-tls, kamailio-websocket, kamailio-postgresql | rpm.kamailio.org, репозиторий конкретного выпуска | 6.1.5 |
 | ngcp-rtpengine | **собственный RPM** `rpm/rtpengine.spec` (тег mr13.5.1.33, без транскодирования и модуля ядра) | 13.5.1.33-1.pbx |
 
 ## АТС (Asterisk)
@@ -20,6 +20,16 @@
 
 Зависимости собственных RPM — из BaseOS/AppStream, CRB и EPEL
 (для rtpengine: libwebsockets, hiredis, mosquitto, libjwt, pandoc при сборке).
+
+Дополнительно на АТС: `unixODBC`, `postgresql-odbc` (AppStream).
+
+## PostgreSQL
+
+| Пакет | Откуда | Версия |
+|-------|--------|--------|
+| `@postgresql:18/server`, postgresql-contrib | AppStream (модуль) | 18 |
+| python3-psycopg2 | AppStream | для модулей Ansible community.postgresql |
+| Alembic, SQLAlchemy, psycopg2-binary | PyPI, окружение `/opt/pbx-db-migrate` | `db/requirements.txt` |
 
 ## Сборка собственных RPM
 

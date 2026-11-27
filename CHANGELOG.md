@@ -5,6 +5,19 @@
 
 ## [Unreleased]
 
+### Added — этап 3
+- ВМ `db` (PostgreSQL 18), роль `postgresql`: база на тенанта с ролями `<код>_owner`/`<код>_asterisk`,
+  база `kamailio`, изоляция в `pg_hba.conf` по парам база/пользователь/адрес.
+- Миграции: Alembic Asterisk 22 (`db/asterisk-alembic`, вендор), свои `db/migrations` (0001 операторы,
+  0002 очереди) и `db/migrate.sh`; функции `pbx_add_operator`, `pbx_add_queue`, `pbx_add_queue_member`.
+- Asterisk: ODBC realtime для PJSIP-операторов и очередей, CDR (cdr_adaptive_odbc) и queue_log в БД;
+  в заглушке движка — очередь `main`; лишние модули отключены.
+- Kamailio: регистратор операторов (UDP и WSS :8443 во внутренней сети), пароли из базы тенанта
+  (заменяемый блок под SSO/AD), регистрации в БД; звонки Asterisk → оператор с изоляцией по тенанту;
+  WebRTC через rtpengine; старт без БД (регистрации в памяти).
+- Тесты: SIPp (регистрация, оператор, звонок со звуком), `tests/wss` (софтфон JsSIP, WSS-клиент,
+  e2e WebRTC на Playwright); runbook `docs/runbooks/add-operator.md`; чек-лист этапа 3.
+
 ### Added — этап 2
 - `rpm/asterisk.spec` (Asterisk 22.12.0, pjproject 2.17) и `rpm/rtpengine.spec`
   (mr13.5.1.33, userspace, без транскодирования); роль `rpm_package` со сборкой и кэшем.

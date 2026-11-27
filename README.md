@@ -121,7 +121,7 @@ pre-commit run --all-files
 |------|-----------|--------|
 | 1 | Скелет, линтеры, ADR, описание тенанта | готово |
 | 2 | Vagrant: sbc + pbx-bii-1, звонок на DID → приветствие | готово |
-| 3 | PostgreSQL, миграции, realtime операторов и очередей, CDR/queue_log | — |
+| 3 | PostgreSQL, миграции, realtime операторов и очередей, CDR/queue_log | готово |
 | 4 | Универсальный входящий движок, чек-лист `tests/calls/bii.md` | — |
 | 5 | pbx-bii-2, отказ и возврат через dispatcher | — |
 | 6 | GitLab CI | — |
