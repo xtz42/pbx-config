@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE scenario SYSTEM "sipp.dtd">
+<!--
+  «Провайдер» звонит на DID через SBC и держит линию -d миллисекунд
+  (приветствие ~7 с, затем очередь/оператор), после чего кладёт трубку сам.
+  В логе (-trace_logs) — адрес медиа из 200 OK: должен быть rtpengine edge.
+  Вариант со звуком: звонящий передаёт G.711 A-law из pcap поставки SIPp
+  (-key pcap /usr/local/src/sipp/pcap/g711a.pcap, ~7 с, через 9 с после ответа) —
+  для проверки двустороннего звука с оператором.
+  Запуск — см. tests/sipp/README.md. Номера синтетические.
+-->
+<scenario name="Провайдер: звонок на DID со звуком">
+
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:[service]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: "SIPp provider" <sip:70009990001@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[service]@[remote_ip]:[remote_port]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: <sip:70009990001@[local_ip]:[local_port]>
+      Max-Forwards: 70
+      Subject: pbx-config stage test
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=- 53655765 2353687637 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8 0 101
+      a=rtpmap:8 PCMA/8000
+      a=rtpmap:0 PCMU/8000
+      a=rtpmap:101 telephone-event/8000
+      a=fmtp:101 0-16
+      a=sendrecv
+
+    ]]>
+  </send>
+
+  <recv response="100" optional="true"/>
+  <recv response="180" optional="true"/>
+  <recv response="183" optional="true"/>
+  <recv response="200" rtd="true" rrs="true">
+    <!-- В SDP ответа должен быть адрес rtpengine на edge, а не адрес Asterisk -->
+    <action>
+      <ereg regexp="c=IN IP4 ([0-9.]+)" search_in="body" check_it="true" assign_to="sdp_all,sdp_ip"/>
+      <log message="SDP 200 OK: [$sdp_all] (адрес медиа [$sdp_ip])"/>
+    </action>
+  </recv>
+
+  <send>
+    <![CDATA[
+      ACK [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: "SIPp provider" <sip:70009990001@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[service]@[remote_ip]:[remote_port]>[peer_tag_param]
+      [routes]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      Contact: <sip:70009990001@[local_ip]:[local_port]>
+      Max-Forwards: 70
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- Звук — после приветствия (~7 с) и соединения с оператором -->
+  <pause milliseconds="9000"/>
+  <nop>
+    <action>
+      <exec play_pcap_audio="[pcap]"/>
+    </action>
+  </nop>
+
+  <!-- Длительность — параметр -d (мс) -->
+  <pause/>
+
+  <send retrans="500">
+    <![CDATA[
+      BYE [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: "SIPp provider" <sip:70009990001@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[service]@[remote_ip]:[remote_port]>[peer_tag_param]
+      [routes]
+      Call-ID: [call_id]
+      CSeq: 2 BYE
+      Contact: <sip:70009990001@[local_ip]:[local_port]>
+      Max-Forwards: 70
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <recv response="200"/>
+
+  <ResponseTimeRepartition value="100, 500, 1000, 2000"/>
+  <CallLengthRepartition value="5000, 10000, 15000"/>
+</scenario>

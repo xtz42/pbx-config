@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE scenario SYSTEM "sipp.dtd">
 <!--
-  «Провайдер» звонит на DID через SBC. Ожидаем: 200 OK от Asterisk (через
-  Kamailio), медиа через rtpengine, приветствие и BYE со стороны Asterisk.
+  «Провайдер» звонит на DID через SBC и держит линию -d миллисекунд
+  (приветствие ~7 с, затем очередь/оператор), после чего кладёт трубку сам.
+  В логе (-trace_logs) — адрес медиа из 200 OK: должен быть rtpengine edge.
   Запуск — см. tests/sipp/README.md. Номера синтетические.
 -->
-<scenario name="DID: приветствие и отбой со стороны АТС">
+<scenario name="Провайдер: звонок на DID">
 
   <send retrans="500">
     <![CDATA[
@@ -63,22 +64,26 @@
     ]]>
   </send>
 
-  <!-- Приветствие длится ~7 с, затем Asterisk кладёт трубку -->
-  <recv request="BYE" timeout="20000"/>
+  <!-- Длительность — параметр -d (мс) -->
+  <pause/>
 
-  <send>
+  <send retrans="500">
     <![CDATA[
-      SIP/2.0 200 OK
-      [last_Via:]
-      [last_From:]
-      [last_To:]
-      [last_Call-ID:]
-      [last_CSeq:]
+      BYE [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: "SIPp provider" <sip:70009990001@[local_ip]:[local_port]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[service]@[remote_ip]:[remote_port]>[peer_tag_param]
+      [routes]
+      Call-ID: [call_id]
+      CSeq: 2 BYE
       Contact: <sip:70009990001@[local_ip]:[local_port]>
+      Max-Forwards: 70
       Content-Length: 0
 
     ]]>
   </send>
+
+  <recv response="200"/>
 
   <ResponseTimeRepartition value="100, 500, 1000, 2000"/>
   <CallLengthRepartition value="5000, 10000, 15000"/>
