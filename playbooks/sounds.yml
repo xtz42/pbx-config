@@ -1,0 +1,10 @@
+---
+# Только обновление звуков, без перезапуска Asterisk:
+#   ansible-playbook playbooks/sounds.yml -i inventory/<стенд>/hosts.yml
+- name: Звуки тенантов
+  hosts: pbx
+  become: true
+  gather_facts: false
+  roles:
+    - role: tenants
+    - role: sounds

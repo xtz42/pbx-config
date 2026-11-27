@@ -1,0 +1,10 @@
+---
+# Полная раскатка. Порядок важен: база → SBC → АТС.
+- name: База данных
+  ansible.builtin.import_playbook: playbooks/db.yml
+
+- name: SBC (Kamailio + rtpengine)
+  ansible.builtin.import_playbook: playbooks/sbc.yml
+
+- name: АТС тенантов (Asterisk)
+  ansible.builtin.import_playbook: playbooks/pbx.yml

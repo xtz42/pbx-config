@@ -50,3 +50,6 @@ recordings/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Кэш собранных RPM и скачанных исходников стенда
+vagrant/cache/

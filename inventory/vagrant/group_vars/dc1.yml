@@ -1,0 +1,4 @@
+---
+# ЦОД 1 — основной. Kamailio dispatcher, алгоритм 8: больший приоритет — первым.
+dc: dc1
+dispatcher_priority: 10

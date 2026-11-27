@@ -1,0 +1,9 @@
+---
+# PostgreSQL: базы тенантов, миграции. Наполняется на этапе 3.
+- name: PostgreSQL
+  hosts: db
+  become: true
+  gather_facts: true
+  roles:
+    - role: base
+      when: base_manage_os | bool

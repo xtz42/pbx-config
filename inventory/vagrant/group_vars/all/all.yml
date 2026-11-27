@@ -1,0 +1,36 @@
+---
+# Общие переменные Vagrant-стенда.
+
+stand: vagrant
+
+# Каждая ВМ провижинит сама себя.
+ansible_connection: local
+# Системный Python AlmaLinux 9 — нужен модулю dnf (python3-dnf).
+ansible_python_interpreter: /usr/bin/python3
+
+# На стенде ОС настраивается ролью base; в проде — по docs/os-setup.md.
+base_manage_os: true
+base_timezone: Asia/Almaty
+base_swap_mb: 2048   # сборка Asterisk на ВМ с 1,5 ГБ памяти
+
+# Сети стенда (используются для зон firewalld).
+net_voice_edge: 192.168.56.0/24
+net_voice_core: 192.168.57.0/24
+
+# Готовые RPM (Asterisk, rtpengine) кэшируются в общей папке, чтобы
+# повторный vagrant up не пересобирал их. vagrant/cache/ — в .gitignore.
+rpm_source: build
+rpm_cache_dir: /vagrant/vagrant/cache/rpms
+
+# Кто может присылать звонки на SBC как «провайдер» (вместо транка Kcell).
+sbc_providers:
+  - name: host-softphone   # софтфон на хосте (Windows), адрес host-only адаптера
+    address: 192.168.56.1
+  - name: provider-vm      # ВМ provider с SIPp (vagrant up provider)
+    address: 192.168.56.5
+
+# Dispatcher: значения как в проде (ADR 0003). Для ускоренной проверки
+# отказа на этапе 5 их можно переопределить в -e.
+kamailio_ds_ping_interval: 30
+kamailio_ds_probing_threshold: 2
+kamailio_ds_inactive_threshold: 20

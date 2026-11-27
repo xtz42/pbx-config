@@ -9,5 +9,5 @@ exclude_paths:
 # Описания тенантов — это переменные, а не плейбуки.
 kinds:
   - vars: "tenants/*.yml"
-  - vars: "inventory/**/group_vars/*.yml"
+  - vars: "inventory/**/group_vars/**/*.yml"
   - vars: "inventory/**/host_vars/*.yml"

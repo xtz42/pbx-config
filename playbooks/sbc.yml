@@ -1,0 +1,11 @@
+---
+- name: SBC — Kamailio и rtpengine
+  hosts: sbc
+  become: true
+  gather_facts: true
+  roles:
+    - role: base
+      when: base_manage_os | bool
+    - role: tenants
+    - role: rtpengine
+    - role: kamailio
