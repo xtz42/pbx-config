@@ -1,0 +1,32 @@
+# Пакеты
+
+## Базовые (все серверы)
+
+`chrony firewalld policycoreutils-python-utils tar bzip2 rsync tcpdump bind-utils sngrep git`
+(`sngrep` — из EPEL).
+
+## SBC
+
+| Пакет | Откуда | Версия |
+|-------|--------|--------|
+| kamailio, kamailio-utils | rpm.kamailio.org, репозиторий конкретного выпуска | 6.1.5 |
+| ngcp-rtpengine | **собственный RPM** `rpm/rtpengine.spec` (тег mr13.5.1.33, без транскодирования и модуля ядра) | 13.5.1.33-1.pbx |
+
+## АТС (Asterisk)
+
+| Пакет | Откуда | Версия |
+|-------|--------|--------|
+| asterisk | **собственный RPM** `rpm/asterisk.spec` (pjproject 2.17 встроенный) | 22.12.0-1.pbx |
+
+Зависимости собственных RPM — из BaseOS/AppStream, CRB и EPEL
+(для rtpengine: libwebsockets, hiredis, mosquitto, libjwt, pandoc при сборке).
+
+## Сборка собственных RPM
+
+Стенд: роль `rpm_package` (вызывается ролями `asterisk` и `rtpengine`)
+собирает пакет по spec, если его нет в кэше (`vagrant/cache/rpms/`):
+исходники проверяются по sha256 (Asterisk, pjproject) или по коммиту тега (rtpengine).
+
+Прод (`rpm_source: repo`): пакеты ставятся из внутреннего репозитория dnf —
+**плейсхолдер**, репозиторий и процесс публикации пакетов будут определены
+вместе с CI (этап 6).

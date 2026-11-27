@@ -58,14 +58,25 @@ Kamailio + rtpengine на краю сети, отдельная пара Asteris
 | `playbooks/` | `sbc.yml`, `pbx.yml`, `db.yml`, `sounds.yml`, `check-drift.yml` | 2–4 |
 | `inventory/` | `vagrant/` (стенд), `test/`, `prod/` (только заготовки с плейсхолдерами) | 2 |
 | `tenants/` | описания тенантов | 1 |
-| `roles/` | `kamailio`, `rtpengine`, `asterisk` (одна на всех тенантов), `postgresql`, `sounds` | 2–4 |
+| `roles/` | `kamailio`, `rtpengine`, `asterisk` (одна на всех тенантов), `postgresql`, `sounds`; служебные `base` (ОС стенда), `tenants` (загрузка `tenants/*.yml`), `rpm_package` (сборка RPM) | 2–4 |
 | `db/` | `asterisk-alembic/` (таблицы Asterisk 22), `migrations/` (свои таблицы), `seed/` (праздники РК, причины пауз) | 3–4 |
 | `sounds/` | `common/{kk,ru}/`, `tenants/<код>/` — через Git LFS | 2, 4 |
-| `rpm/` | `asterisk.spec` | 2 |
+| `rpm/` | `asterisk.spec`, `rtpengine.spec` (+ патч, юнит systemd) | 2 |
 | `tests/` | `sipp/` сценарии, `calls/` чек-листы тестовых звонков | 2–5 |
 | `ci/` | скрипты проверок для pre-commit и GitLab CI | 1, 6 |
 | `vagrant/` | `Vagrantfile` стенда | 2 |
 | `docs/` | архитектура, чеклисты ОС и пакетов, сеть, соответствие Oktell, runbooks, ADR | по ходу |
+
+## Стенд Vagrant
+
+VirtualBox + Vagrant, Ansible внутри ВМ (`ansible_local`). Подробно — [`vagrant/README.md`](vagrant/README.md).
+
+```bash
+cd vagrant && vagrant up
+```
+
+Проверка: звонок софтфоном с хоста на `70000000001@192.168.56.10` или SIPp
+с ВМ `provider` — чек-лист [`tests/calls/bii.md`](tests/calls/bii.md).
 
 ## Подготовка рабочего места
 
@@ -109,7 +120,7 @@ pre-commit run --all-files
 | Этап | Содержание | Статус |
 |------|-----------|--------|
 | 1 | Скелет, линтеры, ADR, описание тенанта | готово |
-| 2 | Vagrant: sbc + pbx-bii-1, звонок на DID → приветствие | — |
+| 2 | Vagrant: sbc + pbx-bii-1, звонок на DID → приветствие | готово |
 | 3 | PostgreSQL, миграции, realtime операторов и очередей, CDR/queue_log | — |
 | 4 | Универсальный входящий движок, чек-лист `tests/calls/bii.md` | — |
 | 5 | pbx-bii-2, отказ и возврат через dispatcher | — |
