@@ -12,8 +12,11 @@ repos:
       - id: mixed-line-ending
         args: ["--fix=lf"]
         exclude: '\.(bat|cmd)$'
+      # Патчи не трогаем: пробел в начале пустой строки контекста значим.
       - id: end-of-file-fixer
+        exclude: '\.patch$'
       - id: trailing-whitespace
+        exclude: '\.patch$'
       - id: detect-private-key
 
   - repo: https://github.com/adrienverge/yamllint

@@ -1,0 +1,41 @@
+--- a/utils/gen-common-flags
++++ b/utils/gen-common-flags
+@@ -1,5 +1,14 @@
+ #!/bin/bash
+ 
++# pbx-config: libav*/libswresample (ffmpeg) нужны только для транскодирования.
++# При сборке with_transcoding=no их отсутствие не должно быть ошибкой.
++gen-pkgconf-flags-optional()
++{
++  if pkg-config --exists "$2"; then
++    gen-pkgconf-flags "$@"
++  fi
++}
++
+ gen-pkgconf-flags()
+ {
+   local var="$1"
+@@ -70,10 +79,10 @@
+ gen-pkgconf-flags GLIB                glib-2.0
+ gen-pkgconf-flags GTHREAD             gthread-2.0
+ gen-pkgconf-flags JSON_GLIB           json-glib-1.0
+-gen-pkgconf-flags LIBAVCODEC          libavcodec
+-gen-pkgconf-flags LIBAVFILTER         libavfilter
+-gen-pkgconf-flags LIBAVFORMAT         libavformat
+-gen-pkgconf-flags LIBAVUTIL           libavutil
++gen-pkgconf-flags-optional LIBAVCODEC          libavcodec
++gen-pkgconf-flags-optional LIBAVFILTER         libavfilter
++gen-pkgconf-flags-optional LIBAVFORMAT         libavformat
++gen-pkgconf-flags-optional LIBAVUTIL           libavutil
+ gen-pkgconf-flags LIBCURL             libcurl
+ gen-pkgconf-flags LIBCRYPTO           libcrypto
+ gen-pkgconf-flags LIBEVENT            libevent_pthreads
+@@ -81,7 +90,7 @@
+ gen-pkgconf-flags LIBNFTNL            libnftnl
+ gen-pkgconf-flags LIBPCRE             libpcre2-8
+ echo "CFLAGS_LIBPCRE += -DPCRE2_CODE_UNIT_WIDTH=8"
+-gen-pkgconf-flags LIBSWRESAMPLE       libswresample
++gen-pkgconf-flags-optional LIBSWRESAMPLE       libswresample
+ gen-pkgconf-flags LIBWEBSOCKETS       libwebsockets
+ gen-pkgconf-flags LIBZ                zlib
+ gen-pkgconf-flags NCURSESW            ncursesw

@@ -1,0 +1,28 @@
+# Юнит systemd для Asterisk из RPM pbx-config.
+# Основан на contrib/systemd/asterisk.service из исходников Asterisk.
+[Unit]
+Description=Asterisk PBX
+Documentation=https://docs.asterisk.org
+# Asterisk привязывается к конкретному адресу voice-core — ждём сеть.
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=notify
+Environment=HOME=/var/lib/asterisk
+WorkingDirectory=/var/lib/asterisk
+User=asterisk
+Group=asterisk
+RuntimeDirectory=asterisk
+RuntimeDirectoryMode=0750
+ExecStart=/usr/sbin/asterisk -mqf -C /etc/asterisk/asterisk.conf
+ExecReload=/usr/sbin/asterisk -rx 'core reload'
+LimitCORE=infinity
+LimitNOFILE=65536
+Restart=always
+RestartSec=4
+StandardOutput=null
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
