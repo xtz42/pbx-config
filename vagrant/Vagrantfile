@@ -1,0 +1,77 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# Vagrant-стенд pbx-config (NET-475). Провайдер — VirtualBox.
+# Роли Ansible те же, что для прода; отличается только inventory/vagrant/.
+# Ansible ставится внутри каждой ВМ (провижнер ansible_local, bootstrap.sh) —
+# на хосте (Windows) Ansible не нужен.
+#
+#   cd vagrant
+#   vagrant up                 # sbc и pbx-bii-1
+#   vagrant up provider        # необязательно: ВМ «провайдера» с SIPp
+#   vagrant provision <ВМ>     # повторная раскатка после изменений в репозитории
+#
+# Сети (VirtualBox host-only, хост получает адрес .1 в каждой):
+#   192.168.56.0/24 — voice-edge: провайдер/софтфон ↔ SBC
+#   192.168.57.0/24 — voice-core: SBC ↔ Asterisk ↔ PostgreSQL
+
+Vagrant.require_version ">= 2.4.0"
+
+BOX = "almalinux/9"
+
+MACHINES = [
+  { name: "sbc",       edge: "192.168.56.10", core: "192.168.57.10", memory: 1024 },
+  { name: "pbx-bii-1",                        core: "192.168.57.21", memory: 1536 },
+  # «Провайдер» (вместо транка Kcell): SIPp. Не стартует по умолчанию.
+  { name: "provider",  edge: "192.168.56.5",                         memory: 512,
+    autostart: false, ansible: false },
+].freeze
+
+Vagrant.configure("2") do |config|
+  config.vm.box = BOX
+  config.vm.box_check_update = false
+
+  # Корень репозитория → /vagrant (роли, tenants/, sounds/, rpm/).
+  # В vagrant/cache/ кэшируются собранные RPM — переживают vagrant destroy.
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  config.vm.synced_folder "..", "/vagrant", type: "virtualbox"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.cpus = 1
+    vb.linked_clone = true
+    vb.check_guest_additions = true
+    vb.customize ["modifyvm", :id, "--audio-driver", "none"]
+    vb.customize ["modifyvm", :id, "--usb", "off"]
+  end
+
+  MACHINES.each do |m|
+    config.vm.define m[:name], autostart: m.fetch(:autostart, true) do |node|
+      node.vm.hostname = m[:name]
+      node.vm.network "private_network", ip: m[:edge] if m[:edge]
+      node.vm.network "private_network", ip: m[:core] if m[:core]
+
+      node.vm.provider "virtualbox" do |vb|
+        vb.name = "pbx-config-#{m[:name]}"
+        vb.memory = m[:memory]
+      end
+
+      if m.fetch(:ansible, true)
+        node.vm.provision "bootstrap", type: "shell", path: "bootstrap.sh"
+
+        node.vm.provision "ansible", type: "ansible_local" do |a|
+          a.install = false                    # ставит bootstrap.sh (закреплённая версия)
+          a.compatibility_mode = "2.0"
+          a.provisioning_path = "/vagrant"
+          # Общая папка VirtualBox доступна всем на запись, поэтому Ansible
+          # не читает ansible.cfg из неё сам — путь передаётся явно.
+          a.config_file = "/vagrant/ansible.cfg"
+          a.inventory_path = "inventory/vagrant/hosts.yml"
+          a.playbook = "site.yml"
+          a.limit = m[:name]                   # каждая ВМ раскатывает только себя
+        end
+      else
+        node.vm.provision "sipp", type: "shell", path: "../tests/sipp/install-sipp.sh"
+      end
+    end
+  end
+end
