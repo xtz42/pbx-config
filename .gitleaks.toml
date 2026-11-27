@@ -1,0 +1,9 @@
+# Конфигурация gitleaks: стандартные правила + исключения для стенда.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Открытые тестовые пароли допустимы только в инвентаре Vagrant"
+paths = [
+  '''^inventory/vagrant/''',
+]

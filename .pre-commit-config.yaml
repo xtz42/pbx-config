@@ -1,0 +1,43 @@
+---
+# Установка:  pip install pre-commit && pre-commit install
+# Прогон по всему репозиторию:  pre-commit run --all-files
+# Обновление версий хуков:  pre-commit autoupdate (отдельным MR)
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-added-large-files   # файлы в Git LFS не проверяются
+        args: ["--maxkb=500"]
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+        exclude: '\.(bat|cmd)$'
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: detect-private-key
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: ["--strict"]
+
+  - repo: https://github.com/ansible/ansible-lint
+    rev: v26.10.1
+    hooks:
+      - id: ansible-lint
+        # хук по умолчанию требует python3.14; нужен любой python >= 3.12
+        language_version: python3
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: vault-encrypted
+        name: секреты test/prod зашифрованы Ansible Vault
+        entry: ci/check-vault-encrypted.sh
+        language: script
+        files: '^inventory/(test|prod)/.*\.vault\.ya?ml$'
