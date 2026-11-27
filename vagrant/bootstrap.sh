@@ -24,4 +24,4 @@ ANSIBLE_COLLECTIONS_PATH="${SITE}" "${VENV}/bin/ansible-galaxy" collection insta
 for b in "${VENV}"/bin/ansible*; do
   ln -sf "${b}" "/usr/local/bin/$(basename "${b}")"
 done
-ansible --version | head -1
+"${VENV}/bin/ansible" --version | head -1

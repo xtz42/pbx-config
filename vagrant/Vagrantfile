@@ -34,7 +34,8 @@ Vagrant.configure("2") do |config|
   # Корень репозитория → /vagrant (роли, tenants/, sounds/, rpm/).
   # В vagrant/cache/ кэшируются собранные RPM — переживают vagrant destroy.
   config.vm.synced_folder ".", "/vagrant", disabled: true
-  config.vm.synced_folder "..", "/vagrant", type: "virtualbox"
+  config.vm.synced_folder "..", "/vagrant", type: "virtualbox",
+                          SharedFoldersEnableSymlinksCreate: false   # символьных ссылок в репозитории нет
 
   config.vm.provider "virtualbox" do |vb|
     vb.cpus = 1
@@ -60,6 +61,8 @@ Vagrant.configure("2") do |config|
 
         node.vm.provision "ansible", type: "ansible_local" do |a|
           a.install = false                    # ставит bootstrap.sh (закреплённая версия)
+          # Полный путь: sudo в AlmaLinux 9 не ищет команды в /usr/local/bin.
+          a.playbook_command = "/opt/ansible/bin/ansible-playbook"
           a.compatibility_mode = "2.0"
           a.provisioning_path = "/vagrant"
           # Общая папка VirtualBox доступна всем на запись, поэтому Ansible
