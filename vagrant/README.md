@@ -31,7 +31,7 @@ vagrant up
 ```powershell
 vagrant provision sbc          # после правок ролей/шаблонов
 vagrant ssh pbx-bii-1 -c "sudo asterisk -rvvv"
-vagrant ssh sbc -c "sudo sngrep"
+vagrant ssh sbc -c "sudo tcpdump -i any -nn -A -s0 udp port 5060"
 vagrant halt                   # остановить, vagrant destroy -f — удалить ВМ
 ```
 

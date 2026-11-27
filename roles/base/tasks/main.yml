@@ -2,34 +2,16 @@
 - name: Проверить ОС
   ansible.builtin.assert:
     that:
-      - ansible_os_family == 'RedHat'
-      - ansible_distribution_major_version == '9'
-    fail_msg: "Поддерживается только AlmaLinux 9 (ADR 0001), а здесь {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      - ansible_facts['os_family'] == 'RedHat'
+      - ansible_facts['distribution_major_version'] == '9'
+    fail_msg: "Поддерживается только AlmaLinux 9 (ADR 0001), а здесь {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
     quiet: true
 
-- name: Подключить EPEL
-  ansible.builtin.dnf:
-    name: epel-release
-    state: present
-
-- name: Включить репозиторий CRB
-  community.general.dnf_config_manager:
-    name: crb
-    state: enabled
-
-- name: Установить базовые пакеты
-  ansible.builtin.dnf:
-    name: "{{ base_packages }}"
-    state: present
-
-- name: Часовой пояс
-  community.general.timezone:
-    name: "{{ base_timezone }}"
-
+# Swap — первым делом: дальше dnf с метаданными EPEL и сборка RPM.
 - name: Swap-файл
   when:
     - base_swap_mb | int > 0
-    - ansible_swaptotal_mb | int < base_swap_mb | int
+    - ansible_facts['swaptotal_mb'] | int < base_swap_mb | int
   block:
     - name: Создать swap-файл
       ansible.builtin.command: "dd if=/dev/zero of=/swapfile bs=1M count={{ base_swap_mb }}"
@@ -58,6 +40,31 @@
     - name: Включить swap
       ansible.builtin.command: swapon -a
       changed_when: true
+
+- name: Подключить EPEL
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+
+# Правкой repo-файла, без запуска dnf: на ВМ с 1 ГБ первый разбор
+# метаданных EPEL через dnf config-manager идёт очень долго.
+- name: Включить репозиторий CRB
+  community.general.ini_file:
+    path: /etc/yum.repos.d/almalinux-crb.repo
+    section: crb
+    option: enabled
+    value: "1"
+    no_extra_spaces: true
+    mode: "0644"
+
+- name: Установить базовые пакеты
+  ansible.builtin.dnf:
+    name: "{{ base_packages }}"
+    state: present
+
+- name: Часовой пояс
+  community.general.timezone:
+    name: "{{ base_timezone }}"
 
 - name: Запустить chronyd и firewalld
   ansible.builtin.systemd_service:

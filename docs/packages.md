@@ -2,8 +2,8 @@
 
 ## Базовые (все серверы)
 
-`chrony firewalld policycoreutils-python-utils tar bzip2 rsync tcpdump bind-utils sngrep git`
-(`sngrep` — из EPEL).
+`chrony firewalld policycoreutils-python-utils tar bzip2 rsync tcpdump bind-utils git`
+(`sngrep` в EPEL 9 нет; SIP смотрим `tcpdump -i any -nn -A -s0 udp port 5060`).
 
 ## SBC
 

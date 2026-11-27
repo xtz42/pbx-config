@@ -106,7 +106,7 @@
 
         - name: Положить пакет в кэш
           ansible.builtin.copy:
-            src: "{{ rpm_package_topdir }}/RPMS/{{ ansible_architecture }}/{{ _rpm_package_file }}"
+            src: "{{ rpm_package_topdir }}/RPMS/{{ ansible_facts['architecture'] }}/{{ _rpm_package_file }}"
             dest: "{{ rpm_package_cache_dir }}/{{ _rpm_package_file }}"
             remote_src: true
             mode: "0644"
