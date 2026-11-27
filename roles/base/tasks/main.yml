@@ -1,0 +1,95 @@
+---
+- name: Проверить ОС
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == 'RedHat'
+      - ansible_distribution_major_version == '9'
+    fail_msg: "Поддерживается только AlmaLinux 9 (ADR 0001), а здесь {{ ansible_distribution }} {{ ansible_distribution_version }}"
+    quiet: true
+
+- name: Подключить EPEL
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+
+- name: Включить репозиторий CRB
+  community.general.dnf_config_manager:
+    name: crb
+    state: enabled
+
+- name: Установить базовые пакеты
+  ansible.builtin.dnf:
+    name: "{{ base_packages }}"
+    state: present
+
+- name: Часовой пояс
+  community.general.timezone:
+    name: "{{ base_timezone }}"
+
+- name: Swap-файл
+  when:
+    - base_swap_mb | int > 0
+    - ansible_swaptotal_mb | int < base_swap_mb | int
+  block:
+    - name: Создать swap-файл
+      ansible.builtin.command: "dd if=/dev/zero of=/swapfile bs=1M count={{ base_swap_mb }}"
+      args:
+        creates: /swapfile
+      register: _base_swapfile
+
+    - name: Права на swap-файл
+      ansible.builtin.file:
+        path: /swapfile
+        mode: "0600"
+
+    - name: Разметить swap  # noqa no-handler
+      ansible.builtin.command: mkswap /swapfile
+      when: _base_swapfile is changed
+      changed_when: true
+
+    - name: Подключить swap в fstab
+      ansible.posix.mount:
+        path: none
+        src: /swapfile
+        fstype: swap
+        opts: sw
+        state: present
+
+    - name: Включить swap
+      ansible.builtin.command: swapon -a
+      changed_when: true
+
+- name: Запустить chronyd и firewalld
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop: [chronyd, firewalld]
+  tags: [systemd]
+
+- name: Зоны firewalld
+  tags: [firewall]
+  block:
+    - name: Создать зоны
+      ansible.posix.firewalld:
+        zone: "{{ item.name }}"
+        state: present
+        permanent: true
+      loop: "{{ base_firewall_zones }}"
+      loop_control:
+        label: "{{ item.name }}"
+      notify: Reload firewalld
+
+    - name: Применить новые зоны
+      ansible.builtin.meta: flush_handlers
+
+    - name: Подсети-источники зон
+      ansible.posix.firewalld:
+        zone: "{{ item.0.name }}"
+        source: "{{ item.1 }}"
+        state: enabled
+        permanent: true
+        immediate: true
+      loop: "{{ base_firewall_zones | subelements('sources') }}"
+      loop_control:
+        label: "{{ item.0.name }} ← {{ item.1 }}"

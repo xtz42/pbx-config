@@ -1,0 +1,3 @@
+---
+# Корень репозитория относительно инвентаря (inventory/<стенд>/hosts.yml).
+tenants_dir: "{{ inventory_dir | dirname | dirname }}/tenants"

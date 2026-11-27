@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: pbx-config
+  description: Базовая настройка AlmaLinux 9 для стендов (в проде — по docs/os-setup.md)
+  license: proprietary
+  min_ansible_version: "2.17"
+  platforms:
+    - name: EL
+      versions: ["9"]
+dependencies: []

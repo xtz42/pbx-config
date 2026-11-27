@@ -1,0 +1,17 @@
+---
+# Откуда брать пакет:
+#   build — собрать по spec (если нет в кэше) и поставить из кэша (стенды);
+#   repo  — поставить из настроенного репозитория dnf (прод, плейсхолдер).
+# Глобальные rpm_source и rpm_cache_dir задаются в инвентаре.
+rpm_package_source: "{{ rpm_source | default('build') }}"
+rpm_package_cache_dir: "{{ rpm_cache_dir | default('/var/cache/pbx-rpms') }}"
+rpm_package_topdir: /root/rpmbuild
+rpm_package_repo_root: "{{ inventory_dir | dirname | dirname }}"
+
+# Параметры, которые задаёт вызывающая роль:
+# rpm_package_name: asterisk                # основной пакет из spec
+# rpm_package_spec: rpm/asterisk.spec       # относительно корня репозитория
+rpm_package_local_sources: []               # файлы из репозитория → SOURCES
+rpm_package_remote_sources: []              # [{url, sha256}]
+rpm_package_git_sources: []                 # [{repo, tag, commit, archive, prefix}]
+rpm_package_build_timeout: 7200             # секунд; на 1 vCPU Asterisk собирается долго

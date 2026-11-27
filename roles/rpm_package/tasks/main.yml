@@ -1,0 +1,118 @@
+---
+- name: "Установка из репозитория: {{ rpm_package_name }}"
+  ansible.builtin.dnf:
+    name: "{{ rpm_package_name }}"
+    state: present
+  when: rpm_package_source == 'repo'
+
+- name: "Сборка и установка из кэша: {{ rpm_package_name }}"
+  when: rpm_package_source == 'build'
+  block:
+    - name: Инструменты сборки RPM
+      ansible.builtin.dnf:
+        name: [rpm-build, rpmdevtools, dnf-plugins-core, git]
+        state: present
+
+    - name: Каталоги rpmbuild и кэша
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ rpm_package_topdir }}/SPECS"
+        - "{{ rpm_package_topdir }}/SOURCES"
+        - "{{ rpm_package_cache_dir }}"
+
+    - name: Скопировать spec
+      ansible.builtin.copy:
+        src: "{{ rpm_package_repo_root }}/{{ rpm_package_spec }}"
+        dest: "{{ rpm_package_topdir }}/SPECS/"
+        mode: "0644"
+
+    - name: Имя файла пакета по spec
+      ansible.builtin.command:
+        cmd: >-
+          rpmspec -q --qf '%{name} %{name}-%{version}-%{release}.%{arch}.rpm\n'
+          {{ rpm_package_topdir }}/SPECS/{{ rpm_package_spec | basename }}
+      register: _rpm_package_q
+      changed_when: false
+
+    - name: Запомнить имя файла
+      ansible.builtin.set_fact:
+        _rpm_package_file: "{{ (_rpm_package_q.stdout_lines | select('match', '^' ~ rpm_package_name ~ ' ') | first).split(' ')[1] }}"
+
+    - name: Есть ли пакет в кэше
+      ansible.builtin.stat:
+        path: "{{ rpm_package_cache_dir }}/{{ _rpm_package_file }}"
+      register: _rpm_package_cached
+
+    - name: Собрать пакет
+      when: not _rpm_package_cached.stat.exists
+      block:
+        - name: Локальные исходники из репозитория
+          ansible.builtin.copy:
+            src: "{{ rpm_package_repo_root }}/{{ item }}"
+            dest: "{{ rpm_package_topdir }}/SOURCES/"
+            mode: "0644"
+          loop: "{{ rpm_package_local_sources }}"
+
+        - name: Скачать исходники (с проверкой sha256)
+          ansible.builtin.get_url:
+            url: "{{ item.url }}"
+            dest: "{{ rpm_package_topdir }}/SOURCES/{{ item.url | basename }}"
+            checksum: "sha256:{{ item.sha256 }}"
+            mode: "0644"
+          loop: "{{ rpm_package_remote_sources }}"
+          loop_control:
+            label: "{{ item.url | basename }}"
+
+        - name: Исходники из git (тег с проверкой коммита) и архив для rpmbuild
+          ansible.builtin.git:
+            repo: "{{ item.repo }}"
+            version: "{{ item.tag }}"
+            dest: "{{ rpm_package_topdir }}/git/{{ item.prefix }}"
+            depth: 1
+            force: true
+            archive: "{{ rpm_package_topdir }}/SOURCES/{{ item.archive }}"
+            archive_prefix: "{{ item.prefix }}/"
+          loop: "{{ rpm_package_git_sources }}"
+          loop_control:
+            label: "{{ item.tag }}"
+          register: _rpm_package_git
+
+        - name: Проверить коммит тега
+          ansible.builtin.assert:
+            that: item.after == item.item.commit
+            fail_msg: "Тег {{ item.item.tag }} указывает на {{ item.after }}, ожидался {{ item.item.commit }}"
+            quiet: true
+          loop: "{{ _rpm_package_git.results }}"
+          loop_control:
+            label: "{{ item.item.tag }}"
+
+        - name: Зависимости сборки
+          ansible.builtin.command:
+            cmd: "dnf -y builddep {{ rpm_package_topdir }}/SPECS/{{ rpm_package_spec | basename }}"
+          register: _rpm_package_builddep
+          changed_when: "'Nothing to do' not in _rpm_package_builddep.stdout"
+
+        - name: "Сборка rpmbuild, таймаут в минутах: {{ (rpm_package_build_timeout / 60) | int }}"
+          ansible.builtin.command:
+            cmd: >-
+              rpmbuild -bb --define '_topdir {{ rpm_package_topdir }}'
+              {{ rpm_package_topdir }}/SPECS/{{ rpm_package_spec | basename }}
+          async: "{{ rpm_package_build_timeout }}"
+          poll: 30
+          changed_when: true
+
+        - name: Положить пакет в кэш
+          ansible.builtin.copy:
+            src: "{{ rpm_package_topdir }}/RPMS/{{ ansible_architecture }}/{{ _rpm_package_file }}"
+            dest: "{{ rpm_package_cache_dir }}/{{ _rpm_package_file }}"
+            remote_src: true
+            mode: "0644"
+
+    - name: Установить пакет из кэша
+      ansible.builtin.dnf:
+        name: "{{ rpm_package_cache_dir }}/{{ _rpm_package_file }}"
+        state: present
+        disable_gpg_check: true   # собственная сборка, не подписана

@@ -1,0 +1,22 @@
+---
+base_timezone: Asia/Almaty
+# 0 — не создавать swap-файл.
+base_swap_mb: 0
+base_packages:
+  - chrony
+  - firewalld
+  - policycoreutils-python-utils
+  - tar
+  - bzip2
+  - rsync
+  - tcpdump
+  - bind-utils
+  - sngrep   # EPEL: просмотр SIP-диалогов в консоли
+  - git
+
+# Зоны firewalld по подсетям-источникам. Порты в них открывают роли сервисов.
+base_firewall_zones:
+  - name: voice-edge
+    sources: ["{{ net_voice_edge }}"]
+  - name: voice-core
+    sources: ["{{ net_voice_core }}"]
