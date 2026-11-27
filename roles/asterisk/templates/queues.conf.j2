@@ -1,0 +1,8 @@
+; {{ ansible_managed }}
+; Очереди и их состав — в базе тенанта (таблицы queues, queue_members).
+[general]
+persistentmembers = no
+autofill = yes
+monitor-type = MixMonitor
+shared_lastcall = yes
+log_membername_as_agent = yes

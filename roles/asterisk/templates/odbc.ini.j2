@@ -1,0 +1,10 @@
+; {{ ansible_managed }}
+; Источник данных ODBC: база тенанта {{ tenants_current.code }} в общем кластере PostgreSQL.
+; Логин и пароль — в /etc/asterisk/res_odbc.conf.
+[asterisk-{{ tenants_current.code }}]
+Description = Asterisk {{ tenants_current.code }}
+Driver      = PostgreSQL
+Servername  = {{ pbx_db_host }}
+Port        = 5432
+Database    = {{ tenants_current.db.name }}
+SSLmode     = prefer

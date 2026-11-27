@@ -9,6 +9,20 @@
       - rpm/asterisk.service
     rpm_package_remote_sources: "{{ asterisk_sources }}"
 
+- name: ODBC для PostgreSQL
+  ansible.builtin.dnf:
+    name: [unixODBC, postgresql-odbc]
+    state: present
+
+- name: Источник данных ODBC
+  ansible.builtin.template:
+    src: odbc.ini.j2
+    dest: /etc/odbc.ini
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart asterisk
+
 - name: Каталог диалплана
   ansible.builtin.file:
     path: /etc/asterisk/extensions.d
@@ -25,6 +39,16 @@
     group: asterisk
     mode: "0640"
   loop: "{{ asterisk_config_files }}"
+  notify: Restart asterisk
+
+- name: Подключение к базе тенанта (пароль)
+  ansible.builtin.template:
+    src: res_odbc.conf.j2
+    dest: /etc/asterisk/res_odbc.conf
+    owner: root
+    group: asterisk
+    mode: "0640"
+  no_log: true
   notify: Restart asterisk
 
 - name: Диалплан

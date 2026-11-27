@@ -1,0 +1,12 @@
+; {{ ansible_managed }}
+; SBC и транспорт — из pjsip.conf (Git), операторы — из базы (realtime).
+[res_pjsip]
+endpoint = config,pjsip.conf,criteria=type=endpoint
+endpoint = realtime,ps_endpoints
+aor = config,pjsip.conf,criteria=type=aor
+aor = realtime,ps_aors
+auth = config,pjsip.conf,criteria=type=auth
+auth = realtime,ps_auths
+
+[res_pjsip_endpoint_identifier_ip]
+identify = config,pjsip.conf,criteria=type=identify

@@ -4,6 +4,10 @@
 dateformat = %F %T.%3q
 use_callids = yes
 appendhostname = no
+; queue_log — в таблицу queue_log базы тенанта (extconfig.conf), не в файл.
+queue_log = yes
+queue_log_to_file = no
+queue_adaptive_realtime = yes
 
 [logfiles]
 console => notice,warning,error

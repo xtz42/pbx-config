@@ -25,6 +25,7 @@ noload => cdr_custom.so
 noload => cel_custom.so
 noload => res_cdrel_custom.so
 noload => cdr_odbc.so
+noload => cdr_csv.so          ; CDR — в базу (cdr_adaptive_odbc)
 
 ; Мониторинг/трассировка — вне текущего объёма
 noload => res_hep.so
@@ -32,6 +33,46 @@ noload => res_hep_pjsip.so
 noload => res_hep_rtcp.so
 noload => res_prometheus.so
 noload => res_statsd.so
+
+; ARI/Stasis и WebSocket-клиенты не используются
+noload => res_ari.so
+noload => res_ari_applications.so
+noload => res_ari_asterisk.so
+noload => res_ari_bridges.so
+noload => res_ari_channels.so
+noload => res_ari_device_states.so
+noload => res_ari_endpoints.so
+noload => res_ari_events.so
+noload => res_ari_model.so
+noload => res_ari_playbacks.so
+noload => res_ari_recordings.so
+noload => res_ari_sounds.so
+noload => res_stasis.so
+noload => res_stasis_answer.so
+noload => res_stasis_broadcast.so
+noload => res_stasis_device_state.so
+noload => res_stasis_playback.so
+noload => res_stasis_recording.so
+noload => res_stasis_snoop.so
+noload => app_stasis.so
+noload => app_stasis_broadcast.so
+noload => res_websocket_client.so
+noload => chan_websocket.so
+noload => res_http_media_cache.so
+
+; Возможности, которых нет в объёме проекта
+noload => app_agent_pool.so    ; агенты — через очереди и PJSIP
+noload => app_confbridge.so
+noload => app_page.so
+noload => app_followme.so
+noload => app_amd.so
+noload => res_parking.so
+noload => cel_manager.so
+noload => cel_odbc.so          ; CEL выключен (cel.conf), отчёты — по CDR и queue_log
+noload => cdr_manager.so
+noload => res_stun_monitor.so
+noload => res_pjsip_notify.so
+noload => res_clialiases.so
 
 ; Прочее ненужное
 noload => res_calendar.so

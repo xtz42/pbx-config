@@ -1,0 +1,11 @@
+; {{ ansible_managed }}
+[asterisk]
+enabled => yes
+dsn => asterisk-{{ tenants_current.code }}
+username => {{ tenants_current.db.user }}
+password => {{ vault_tenant_secrets[tenants_current.code].db_password }}
+pre-connect => yes
+max_connections => 10
+sanitysql => select 1
+; Если БД недоступна — переподключаться не чаще раза в 5 с.
+negative_connection_cache => 5

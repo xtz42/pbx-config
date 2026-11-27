@@ -1,7 +1,7 @@
 ; {{ ansible_managed }}
 ; Универсальный входящий движок.
 ;
-; Этап 2 — заглушка: ответить и проиграть приветствие тенанта.
+; Этап 3 — заглушка: приветствие тенанта и очередь «main» (из базы тенанта).
 ; Этап 4 — маршрут из did_routes, график, праздники, чёрный список,
 ;          меню, очередь (см. tests/calls/bii.md).
 
@@ -15,4 +15,9 @@ exten => _X.,1,Set(CHANNEL(language)=${DEFAULT_LANGUAGE})
  same => n,Answer()
  same => n,Wait(0.5)
  same => n,Playback(tenants/${TENANT}/welcome)
+ same => n,Queue(main,t,,,300)
  same => n,Hangup()
+
+[from-operator]
+; Звонки от операторов (через SBC) — этап 4 (переводы, служебные коды).
+exten => _X.,1,Hangup(21)

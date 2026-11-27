@@ -19,6 +19,18 @@ asterisk_config_files:
   - indications.conf
   - rtp.conf
   - pjsip.conf
+  - sorcery.conf
+  - extconfig.conf
+  - queues.conf
+  - cdr.conf
+  - cdr_adaptive_odbc.conf
+  - musiconhold.conf
+  - features.conf
+  - udptl.conf
+  - ccss.conf
+  - acl.conf
+  - pjproject.conf
+  - cel.conf
   - extensions.conf
 
 # Файлы диалплана (templates/extensions.d/ → /etc/asterisk/extensions.d/).
