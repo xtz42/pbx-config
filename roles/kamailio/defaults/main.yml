@@ -1,0 +1,27 @@
+---
+# Версия фиксируется репозиторием конкретного выпуска rpm.kamailio.org.
+kamailio_version: "6.1.5"
+kamailio_branch: "{{ kamailio_version.split('.')[:2] | join('.') }}"
+kamailio_repo_baseurl: "https://rpm.kamailio.org/rhel/9/{{ kamailio_branch }}/{{ kamailio_version }}/$basearch/"
+kamailio_packages:
+  - kamailio
+  - kamailio-utils
+
+kamailio_debug: 2
+kamailio_children: 4
+kamailio_shm_mb: 128
+kamailio_pkg_mb: 8
+
+# Группы адресов модуля permissions (address.list).
+kamailio_addr_group_providers: 1
+kamailio_addr_group_pbx: 2
+
+# Dispatcher (ADR 0003): возврат на ЦОД 1 через
+# ds_ping_interval × ds_inactive_threshold = 30 с × 20 = 10 мин стабильности.
+kamailio_ds_ping_interval: 30
+kamailio_ds_probing_threshold: 2
+kamailio_ds_inactive_threshold: 20
+# Сколько ждать первого ответа от Asterisk, прежде чем пробовать следующий (мс).
+kamailio_ds_fr_timeout_ms: 2000
+
+kamailio_firewall_manage: "{{ base_manage_os | default(false) }}"

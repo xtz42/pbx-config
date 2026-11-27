@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+# rtpengine SBC {{ inventory_hostname }}. Два логических интерфейса:
+#   edge — провайдер и операторы снаружи (voice-edge),
+#   core — Asterisk тенантов (voice-core).
+# Kamailio выбирает пару интерфейсов флагами direction=… в rtpengine_offer/answer.
+
+[rtpengine]
+# Без модуля ядра: пересылка медиа в userspace.
+table = -1
+
+interface = edge/{{ edge_ip }};core/{{ core_ip }}
+
+listen-ng = 127.0.0.1:{{ rtpengine_ng_port }}
+listen-cli = 127.0.0.1:{{ rtpengine_cli_port }}
+
+port-min = {{ rtpengine_port_min }}
+port-max = {{ rtpengine_port_max }}
+
+# Таймауты потоков: нет RTP 60 с → вызов закрывается; на удержании — 1 ч.
+timeout = 60
+silent-timeout = 3600
+final-timeout = 10800
+delete-delay = 30
+
+# DSCP EF для медиа.
+tos = 184
+
+log-level = {{ rtpengine_log_level }}
+log-facility = local1

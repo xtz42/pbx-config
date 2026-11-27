@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+# Принадлежность DID тенантам (из tenants/*.yml). Поведение DID —
+# в таблице did_routes базы тенанта, здесь только выбор набора dispatcher.
+
+route[DID_TO_TENANT] {
+	$var(setid) = 0;
+	$var(tenant) = "";
+	switch ($rU) {
+{% for code, t in tenants_all | dictsort if t.enabled %}
+		# {{ code }} — {{ t.name }}
+{%   for did in t.sbc.dids %}
+		case "{{ did }}":
+{%   endfor %}
+			$var(setid) = {{ t.sbc.dispatcher_setid }};
+			$var(tenant) = "{{ code }}";
+			break;
+{% endfor %}
+	}
+}

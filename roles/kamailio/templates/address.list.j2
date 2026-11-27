@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+# Доверенные источники SIP (модуль permissions).
+# (groupid) (address) (netmask) (port) (tag)
+
+# Группа {{ kamailio_addr_group_providers }}: провайдеры (транки)
+{% for p in sbc_providers | default([]) %}
+{{ kamailio_addr_group_providers }} {{ p.address }} {{ p.netmask | default(32) }} 0 {{ p.name }}
+{% endfor %}
+
+# Группа {{ kamailio_addr_group_pbx }}: узлы Asterisk тенантов
+{% for host in groups['pbx'] | default([]) %}
+{{ kamailio_addr_group_pbx }} {{ hostvars[host].core_ip }} 32 0 {{ host }}
+{% endfor %}

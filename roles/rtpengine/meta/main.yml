@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: pbx-config
+  description: rtpengine (медиа-прокси SBC), userspace-пересылка
+  license: proprietary
+  min_ansible_version: "2.17"
+  platforms:
+    - name: EL
+      versions: ["9"]
+dependencies: []

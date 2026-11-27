@@ -1,0 +1,42 @@
+---
+- name: Пакет rtpengine
+  ansible.builtin.include_role:
+    name: rpm_package
+  vars:
+    rpm_package_name: ngcp-rtpengine
+    rpm_package_spec: rpm/rtpengine.spec
+    rpm_package_local_sources:
+      - rpm/rtpengine-optional-ffmpeg.patch
+    rpm_package_git_sources:
+      - repo: "{{ rtpengine_git_repo }}"
+        tag: "{{ rtpengine_tag }}"
+        commit: "{{ rtpengine_commit }}"
+        prefix: "rtpengine-{{ rtpengine_tag }}"
+        archive: "rtpengine-{{ rtpengine_tag }}.tar.gz"
+
+- name: Конфигурация rtpengine
+  ansible.builtin.template:
+    src: rtpengine.conf.j2
+    dest: /etc/rtpengine/rtpengine.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart rtpengine
+
+- name: Медиапорты в firewalld
+  ansible.posix.firewalld:
+    zone: "{{ item }}"
+    port: "{{ rtpengine_port_min }}-{{ rtpengine_port_max }}/udp"
+    state: enabled
+    permanent: true
+    immediate: true
+  loop: [voice-edge, voice-core]
+  when: rtpengine_firewall_manage | bool
+  tags: [firewall]
+
+- name: Запустить rtpengine
+  ansible.builtin.systemd_service:
+    name: rtpengine
+    state: started
+    enabled: true
+  tags: [systemd]

@@ -1,0 +1,265 @@
+#!KAMAILIO
+#
+# {{ ansible_managed }}
+#
+# SBC {{ inventory_hostname }}: Kamailio {{ kamailio_version }} + rtpengine.
+#   edge ({{ edge_ip }}) — провайдер (транк), снаружи;
+#   core ({{ core_ip }}) — пары Asterisk тенантов.
+# Входящий звонок: провайдер → DID → набор dispatcher тенанта (алгоритм 8,
+# приоритет ЦОД 1) → Asterisk. Отказ узла → ds_mark_dst + ds_next_dst().
+# Регистратор операторов (WSS) добавляется на этапе 3.
+
+####### Определения #######
+#!define EDGE_IP "{{ edge_ip }}"
+#!define CORE_IP "{{ core_ip }}"
+
+####### Глобальные параметры #######
+debug={{ kamailio_debug }}
+log_stderror=no
+log_facility=LOG_LOCAL0
+log_prefix="{$mt $hdr(CSeq) $ci} "
+memdbg=5
+memlog=5
+children={{ kamailio_children }}
+auto_aliases=no
+dns=no
+rev_dns=no
+use_dns_cache=off
+server_signature=no
+sip_warning=0
+user_agent_header="User-Agent: pbx-sbc"
+server_header="Server: pbx-sbc"
+
+listen=udp:{{ edge_ip }}:5060
+listen=udp:{{ core_ip }}:5060
+
+####### Модули #######
+loadmodule "jsonrpcs.so"
+loadmodule "kex.so"
+loadmodule "corex.so"
+loadmodule "tm.so"
+loadmodule "tmx.so"
+loadmodule "sl.so"
+loadmodule "rr.so"
+loadmodule "pv.so"
+loadmodule "maxfwd.so"
+loadmodule "textops.so"
+loadmodule "siputils.so"
+loadmodule "xlog.so"
+loadmodule "sanity.so"
+loadmodule "ctl.so"
+loadmodule "cfgutils.so"
+loadmodule "permissions.so"
+loadmodule "dispatcher.so"
+loadmodule "rtpengine.so"
+
+####### Параметры модулей #######
+modparam("jsonrpcs", "pretty_format", 1)
+
+modparam("tm", "failure_reply_mode", 3)
+modparam("tm", "fr_timer", 30000)
+modparam("tm", "fr_inv_timer", 120000)
+
+modparam("rr", "enable_full_lr", 0)
+modparam("rr", "append_fromtag", 0)
+
+modparam("permissions", "address_file", "/etc/kamailio/address.list")
+
+modparam("dispatcher", "list_file", "/etc/kamailio/dispatcher.list")
+# Бит 2 — поддержка перебора (failover) через ds_next_dst().
+modparam("dispatcher", "flags", 2)
+modparam("dispatcher", "xavp_dst", "_dsdst_")
+modparam("dispatcher", "xavp_ctx", "_dsctx_")
+modparam("dispatcher", "ds_ping_method", "OPTIONS")
+modparam("dispatcher", "ds_ping_from", "sip:sbc@{{ core_ip }}")
+modparam("dispatcher", "ds_ping_interval", {{ kamailio_ds_ping_interval }})
+modparam("dispatcher", "ds_probing_mode", 1)
+modparam("dispatcher", "ds_probing_threshold", {{ kamailio_ds_probing_threshold }})
+modparam("dispatcher", "ds_inactive_threshold", {{ kamailio_ds_inactive_threshold }})
+# Любой ответ 2xx (и 404 — узел жив, но не знает адресата) — узел доступен.
+modparam("dispatcher", "ds_ping_reply_codes", "class=2;code=404")
+
+modparam("rtpengine", "rtpengine_sock", "udp:127.0.0.1:{{ rtpengine_ng_port | default(2223) }}")
+
+####### Маршрутизация #######
+
+request_route {
+	route(REQINIT);
+
+	if (is_method("CANCEL")) {
+		if (t_check_trans()) {
+			route(RELAY);
+		}
+		exit;
+	}
+
+	if (!is_method("ACK")) {
+		if (t_precheck_trans()) {
+			t_check_trans();
+			exit;
+		}
+		t_check_trans();
+	}
+
+	route(WITHINDLG);
+
+	# Дальше — только начальные запросы.
+	remove_hf("Route");
+
+	if (is_method("OPTIONS") && uri==myself && $rU==$null) {
+		sl_send_reply("200", "OK");
+		exit;
+	}
+
+	if (allow_source_address("{{ kamailio_addr_group_providers }}")) {
+		route(FROM_PROVIDER);
+	}
+	if (allow_source_address("{{ kamailio_addr_group_pbx }}")) {
+		route(FROM_PBX);
+	}
+
+	xlog("L_WARN", "отклонён $rm от неизвестного источника $si:$sp\n");
+	sl_send_reply("403", "Forbidden");
+	exit;
+}
+
+route[REQINIT] {
+	if (!mf_process_maxfwd_header("10")) {
+		sl_send_reply("483", "Too Many Hops");
+		exit;
+	}
+	if (!sanity_check()) {
+		xlog("L_WARN", "некорректный запрос от $si:$sp\n");
+		exit;
+	}
+}
+
+# Запросы внутри диалога (BYE, re-INVITE, ACK) — по Route-заголовкам.
+route[WITHINDLG] {
+	if (!has_totag()) return;
+
+	if (loose_route()) {
+		route(RTPE_DIRECTION);
+		if (is_method("BYE")) {
+			rtpengine_delete();
+		}
+		route(RELAY);
+		exit;
+	}
+
+	if (is_method("ACK")) {
+		if (t_check_trans()) {
+			route(RELAY);
+		}
+		exit;
+	}
+
+	sl_send_reply("404", "Not Here");
+	exit;
+}
+
+# Направление медиа для rtpengine — по интерфейсу, на который пришёл запрос.
+# rtpengine читает пару direction в порядке движения ТЕКУЩЕГО сообщения:
+# offer идёт от вызывающего к вызываемому, answer — обратно.
+route[RTPE_DIRECTION] {
+	if ($Ri == EDGE_IP) {
+		route(RTPE_EDGE_TO_CORE);
+	} else {
+		$avp(rtpe_offer) = "direction=core direction=edge";
+		$avp(rtpe_answer) = "direction=edge direction=core";
+	}
+}
+
+route[RTPE_EDGE_TO_CORE] {
+	$avp(rtpe_offer) = "direction=edge direction=core";
+	$avp(rtpe_answer) = "direction=core direction=edge";
+}
+
+route[FROM_PROVIDER] {
+	if (!is_method("INVITE")) {
+		sl_send_reply("405", "Method Not Allowed");
+		exit;
+	}
+
+	record_route();
+	route(NORMALIZE_DID);
+	route(DID_TO_TENANT);
+
+	if ($var(setid) == 0) {
+		xlog("L_NOTICE", "неизвестный DID $rU от $si\n");
+		sl_send_reply("404", "Not Found");
+		exit;
+	}
+
+	if (!ds_select_dst("$var(setid)", "8")) {
+		xlog("L_ERR", "DID $rU: тенант $var(tenant) — нет доступных узлов Asterisk\n");
+		send_reply("503", "Service Unavailable");
+		exit;
+	}
+
+	xlog("L_INFO", "DID $rU → тенант $var(tenant), набор $var(setid), узел $du\n");
+	route(RTPE_EDGE_TO_CORE);
+	t_set_fr(0, {{ kamailio_ds_fr_timeout_ms }});
+	t_on_failure("DISPATCH_FAILURE");
+	route(RELAY);
+}
+
+# Начальные запросы от Asterisk (звонки операторам) — этап 3.
+route[FROM_PBX] {
+	sl_send_reply("501", "Not Implemented");
+	exit;
+}
+
+# Формат номера от провайдера уточняется (docs/placeholders.md): пока только «+».
+route[NORMALIZE_DID] {
+	if ($rU =~ "^\+") {
+		$rU = $(rU{s.substr,1,0});
+	}
+}
+
+route[RELAY] {
+	if (is_method("INVITE|UPDATE")) {
+		if (has_body("application/sdp")) {
+			if (!rtpengine_offer("$avp(rtpe_offer) replace-origin replace-session-connection ICE=remove")) {
+				xlog("L_ERR", "rtpengine недоступен: $rm $ru\n");
+				if (!has_totag()) {
+					# Без медиапрокси звонок будет без звука — лучше явный отказ.
+					send_reply("503", "Media Proxy Unavailable");
+					exit;
+				}
+			}
+		}
+		t_on_reply("MANAGE_REPLY");
+	}
+	if (!t_relay()) {
+		sl_reply_error();
+	}
+	exit;
+}
+
+onreply_route[MANAGE_REPLY] {
+	if (has_body("application/sdp")) {
+		rtpengine_answer("$avp(rtpe_answer) replace-origin replace-session-connection ICE=remove");
+	}
+}
+
+# Узел Asterisk не ответил или ответил 5xx — помечаем его и пробуем следующий.
+failure_route[DISPATCH_FAILURE] {
+	if (t_is_canceled()) {
+		rtpengine_delete();
+		exit;
+	}
+
+	if (t_check_status("500|502|503|504") || (t_branch_timeout() && !t_branch_replied())) {
+		xlog("L_WARN", "узел $du не принял вызов ($T_reply_code), пробуем следующий\n");
+		ds_mark_dst("ip");
+		if (ds_next_dst()) {
+			t_set_fr(0, {{ kamailio_ds_fr_timeout_ms }});
+			t_on_failure("DISPATCH_FAILURE");
+			route(RELAY);
+		}
+	}
+	rtpengine_delete();
+}
+
+include_file "/etc/kamailio/tenants.cfg"

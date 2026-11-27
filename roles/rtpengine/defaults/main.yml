@@ -1,0 +1,14 @@
+---
+# Исходники: тег ветки LTS mr13.5 и его коммит (проверяется при сборке).
+rtpengine_git_repo: https://github.com/sipwise/rtpengine
+rtpengine_tag: mr13.5.1.33
+rtpengine_commit: 6732fb2b4ae0f3b57f97c72a87ae6f9ac6ddcb4c
+
+# Управляющий порт ng-протокола (Kamailio ↔ rtpengine), только localhost.
+rtpengine_ng_port: 2223
+rtpengine_cli_port: 9900
+# Диапазон медиапортов на обоих интерфейсах.
+rtpengine_port_min: 30000
+rtpengine_port_max: 40000
+rtpengine_log_level: 6
+rtpengine_firewall_manage: "{{ base_manage_os | default(false) }}"

@@ -1,0 +1,88 @@
+---
+- name: Репозиторий Kamailio {{ kamailio_version }}
+  ansible.builtin.yum_repository:
+    name: "kamailio-{{ kamailio_version }}"
+    description: "Kamailio {{ kamailio_version }} (rpm.kamailio.org)"
+    baseurl: "{{ kamailio_repo_baseurl }}"
+    gpgcheck: true
+    gpgkey: https://rpm.kamailio.org/rpm-pub.key
+    enabled: true
+
+- name: Пакеты Kamailio
+  ansible.builtin.dnf:
+    name: "{{ kamailio_packages }}"
+    state: present
+
+- name: Каталог drop-in systemd для Kamailio
+  ansible.builtin.file:
+    path: /etc/systemd/system/kamailio.service.d
+    state: directory
+    mode: "0755"
+
+- name: Kamailio стартует после rtpengine
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/kamailio.service.d/10-rtpengine.conf
+    content: |
+      # Управляется Ansible: roles/kamailio
+      # Иначе модуль rtpengine Kamailio при загрузке не дождётся rtpengine
+      # и на время rtpengine_disable_tout будет отклонять звонки.
+      [Unit]
+      Wants=rtpengine.service
+      After=rtpengine.service
+    mode: "0644"
+  notify: Restart kamailio
+
+- name: Память Kamailio
+  ansible.builtin.template:
+    src: kamailio.sysconfig.j2
+    dest: /etc/sysconfig/kamailio
+    mode: "0644"
+  notify: Restart kamailio
+
+- name: Наборы dispatcher (пары Asterisk тенантов)
+  ansible.builtin.template:
+    src: dispatcher.list.j2
+    dest: /etc/kamailio/dispatcher.list
+    mode: "0644"
+  notify: Reload kamailio dispatcher
+
+- name: Доверенные адреса (провайдеры, Asterisk)
+  ansible.builtin.template:
+    src: address.list.j2
+    dest: /etc/kamailio/address.list
+    mode: "0644"
+  notify: Reload kamailio addresses
+
+- name: Принадлежность DID тенантам
+  ansible.builtin.template:
+    src: tenants.cfg.j2
+    dest: /etc/kamailio/tenants.cfg
+    mode: "0644"
+  notify: Restart kamailio
+
+- name: Основная конфигурация (с проверкой kamailio -c)
+  ansible.builtin.template:
+    src: kamailio.cfg.j2
+    dest: /etc/kamailio/kamailio.cfg
+    mode: "0644"
+    validate: kamailio -c -f %s
+  notify: Restart kamailio
+
+- name: SIP в firewalld
+  ansible.posix.firewalld:
+    zone: "{{ item }}"
+    port: 5060/udp
+    state: enabled
+    permanent: true
+    immediate: true
+  loop: [voice-edge, voice-core]
+  when: kamailio_firewall_manage | bool
+  tags: [firewall]
+
+- name: Запустить Kamailio
+  ansible.builtin.systemd_service:
+    name: kamailio
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags: [systemd]

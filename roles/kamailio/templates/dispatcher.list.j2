@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# Наборы dispatcher: один набор на тенанта, в наборе — пара Asterisk тенанта.
+# Алгоритм 8: первым выбирается узел с большим приоритетом (ЦОД 1).
+#
+# setid  destination  flags  priority  attrs
+{% for code, t in tenants_all | dictsort if t.enabled %}
+
+# {{ code }} — {{ t.name }}
+{%   for host in groups['pbx'] | default([]) if hostvars[host].tenant == code %}
+{{ t.sbc.dispatcher_setid }} sip:{{ hostvars[host].core_ip }}:5060 0 {{ hostvars[host].dispatcher_priority | default(1) }} socket=udp:{{ core_ip }}:5060;duid={{ host }}
+{%   endfor %}
+{% endfor %}
