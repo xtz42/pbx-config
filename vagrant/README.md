@@ -37,6 +37,12 @@ vagrant halt                   # остановить, vagrant destroy -f — у
 
 ## Если что-то пошло не так
 
+- **`[BUG] Segmentation fault` в `C:/Program Files/Vagrant/embedded/...`** при любой
+  команде Vagrant — падает сторонний плагин Vagrant (так было с `vagrant-hostmanager`
+  на Windows). Стенду плагины не нужны: в окне PowerShell перед командами Vagrant
+  выполните `$env:VAGRANT_NO_PLUGINS = "1"` или удалите плагин
+  (`vagrant plugin uninstall <имя>`, список — `vagrant plugin list`).
+
 - **Не монтируется /vagrant (vboxsf)** — в боксе нет Guest Additions нужной
   версии: `vagrant plugin install vagrant-vbguest`, затем `vagrant reload`.
 - **`welcome.wav — указатель Git LFS`** — репозиторий клонирован без LFS:
